@@ -63,7 +63,17 @@ Qeem Backend is the powerful API engine behind Egypt's first AI-powered freelanc
    pip install -r requirements.txt
    ```
 
-2. **Database Setup**
+2. **Configure Environment**
+
+   ```bash
+   # Copy configuration templates
+   cp env.example .env
+   cp alembic.ini.example alembic.ini
+
+   # Edit configuration files with your values
+   ```
+
+3. **Database Setup**
 
    ```bash
    # Create database and user
@@ -77,7 +87,7 @@ Qeem Backend is the powerful API engine behind Egypt's first AI-powered freelanc
    alembic upgrade head
    ```
 
-3. **Environment Configuration**
+4. **Environment Configuration**
 
    ```bash
    # Copy example environment
@@ -89,7 +99,7 @@ Qeem Backend is the powerful API engine behind Egypt's first AI-powered freelanc
    JWT_SECRET=your-super-secret-jwt-key-here
    ```
 
-4. **Run the Server**
+5. **Run the Server**
 
    ```bash
    # Development
