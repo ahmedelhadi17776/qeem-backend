@@ -1,16 +1,20 @@
 """Alembic configuration for database migrations."""
 
-from app.models import *  # Import all models
-from app.models.base import Base
-from logging.config import fileConfig
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-from alembic import context
 import os
 import sys
+from logging.config import fileConfig
 
-# Add the app directory to the Python path
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from alembic import context
+from sqlalchemy import engine_from_config, pool
+
+# Ensure the project root is on sys.path BEFORE importing app modules
+PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
+
+# Now import models so metadata is populated
+from app.models.base import Base  # noqa: E402
+from app import models as _models  # noqa: F401,E402  # import side-effects to register models
 
 
 # this is the Alembic Config object, which provides
@@ -22,8 +26,7 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
+# add your model's MetaData object here for 'autogenerate' support
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
@@ -55,6 +58,8 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        compare_type=True,
+        compare_server_default=True,
     )
 
     with context.begin_transaction():
@@ -79,7 +84,10 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            compare_server_default=True,
         )
 
         with context.begin_transaction():

@@ -1,6 +1,6 @@
 """Market statistics model for ML data."""
 
-from sqlalchemy import Column, String, Float, Integer, Date, Text
+from sqlalchemy import Column, String, Float, Integer, Date, Text, JSON
 from sqlalchemy.dialects.postgresql import JSONB
 
 from .base import Base, IDMixin, TimestampMixin
@@ -40,6 +40,6 @@ class MarketStatistics(Base, IDMixin, TimestampMixin):
     # rising, stable, declining
     market_trend = Column(String(20), nullable=True)
 
-    # Raw Data Reference
-    # References to MongoDB documents
-    raw_data_ids = Column(JSONB, nullable=True)
+    # Raw Data Reference: JSON on SQLite, JSONB on Postgres
+    raw_data_ids = Column(JSON().with_variant(
+        JSONB, "postgresql"), nullable=True)

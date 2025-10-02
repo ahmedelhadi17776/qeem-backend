@@ -158,15 +158,10 @@ POST /api/v1/negotiations/suggest
 
 ```bash
 # Run all tests
-python tests/run_tests.py all
-
-# Run specific test categories
-python tests/run_tests.py db      # Database tests
-python tests/run_tests.py models # Model tests
-python tests/run_tests.py api    # API tests
+pytest tests/ -q
 
 # With coverage
-pytest tests/ --cov=app --cov-report=html
+pytest tests/ --cov=app --cov-report=term-missing
 ```
 
 ## 🗄️ Database Schema

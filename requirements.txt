@@ -1,6 +1,7 @@
 fastapi==0.116.2
 uvicorn[standard]==0.30.6     # if no breaking changes; or bump minor
 pydantic==2.9.2               # or newer 2.x depending compatibility
+pydantic-settings>=2.4,<3.0   # settings management for Pydantic v2
 sqlalchemy==2.0.35            # or newer 2.x patch
 alembic==1.13.2               # or newer 1.x patch
 psycopg2-binary==2.9.9        # or latest safe binary build
