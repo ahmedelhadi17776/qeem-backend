@@ -48,7 +48,8 @@ RUN pip install --no-cache-dir --no-index --find-links /wheels -r requirements.t
 COPY --from=builder /app/app ./app
 
 ENV UVICORN_HOST=0.0.0.0 \
-    UVICORN_PORT=8000
+    UVICORN_PORT=8000 \
+    UVICORN_WORKERS=1
 
 EXPOSE 8000
 
@@ -61,4 +62,4 @@ USER appuser
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl -fsS http://127.0.0.1:${UVICORN_PORT}/health || exit 1
 
-CMD ["sh", "-c", "uvicorn app.main:app --host ${UVICORN_HOST} --port ${UVICORN_PORT} --proxy-headers"]
+CMD ["sh", "-c", "uvicorn app.main:app --host ${UVICORN_HOST} --port ${UVICORN_PORT} --workers ${UVICORN_WORKERS} --proxy-headers"]

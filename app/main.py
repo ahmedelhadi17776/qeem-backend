@@ -14,9 +14,15 @@ from .config import get_settings
 from .database import create_tables
 import os
 import logging
+from .schemas.common import HealthResponse
+from .logging_config import (
+    configure_logging,
+    configure_uvicorn_json_logging,
+    configure_uvicorn_text_logging,
+)
 
 try:
-    import sentry_sdk
+    import sentry_sdk # type: ignore[import-not-found]
 except Exception:
     sentry_sdk = None
 
@@ -31,9 +37,9 @@ async def lifespan(app: FastAPI):
     # startup
     if sentry_sdk and (settings.sentry.dsn or os.getenv("SENTRY_DSN")):
         sentry_sdk.init(dsn=settings.sentry.dsn or os.getenv("SENTRY_DSN"))
-    # set base log level
-    logging.getLogger().setLevel(
-        getattr(logging, settings.log_level.upper(), logging.INFO))
+    # configure logging (JSON; set LOG_LEVEL via env per environment)
+    configure_logging(level=settings.log_level, fmt="json")
+    configure_uvicorn_json_logging(settings.log_level)
     create_tables()
     yield
     # shutdown
@@ -48,10 +54,10 @@ app = FastAPI(
 )
 
 
-@app.get("/health")
-async def health() -> dict:
+@app.get("/health", response_model=HealthResponse)
+async def health() -> HealthResponse:
     """Health check endpoint."""
-    return {"status": "ok", "service": "qeem-backend"}
+    return HealthResponse()
 
 
 # Mount API v1 routers (include sub-routers before mounting to the app)

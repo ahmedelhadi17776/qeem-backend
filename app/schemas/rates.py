@@ -3,6 +3,7 @@
 from typing import Literal, Annotated
 
 from pydantic import BaseModel, Field
+from typing import List
 
 
 class RateRequest(BaseModel):
@@ -39,3 +40,8 @@ class RateResponse(BaseModel):
     rationale: str = Field(
         default="Rule-based calculation using project complexity, experience, skills, client region, and urgency."
     )
+
+
+class RateHistoryResponse(BaseModel):
+    items: List[RateResponse] = Field(
+        default_factory=list, description="List of previous rate calculations")
