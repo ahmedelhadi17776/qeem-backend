@@ -1,0 +1,47 @@
+name: backend-ci
+
+on:
+    pull_request:
+        branches: [develop]
+        paths:
+            - "qeem-backend/**"
+    push:
+        branches: [develop]
+        paths:
+            - "qeem-backend/**"
+
+jobs:
+    build-test:
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: qeem-backend
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.12"
+                  cache: "pip"
+                  cache-dependency-path: qeem-backend/requirements.txt
+
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install -r requirements.txt
+                  pip install black flake8 mypy pytest
+
+            - name: Lint (Black)
+              run: black --check app
+
+            - name: Lint (Flake8)
+              run: flake8 app
+
+            - name: Type check (mypy)
+              run: mypy --ignore-missing-imports app
+
+            - name: Run tests
+              env:
+                  DATABASE_URL: sqlite:///./test_ci.db
+              run: pytest -q

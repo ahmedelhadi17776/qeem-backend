@@ -1,10 +1,17 @@
 """Test configuration and fixtures."""
 
 import os
+import sys
+from pathlib import Path
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
+
+# Ensure project root is on sys.path so `import app` works when running from tests/
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 # Load environment variables
 load_dotenv()

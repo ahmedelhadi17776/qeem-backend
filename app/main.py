@@ -1,8 +1,6 @@
 """Main FastAPI application."""
 
-import os
-from typing import List
-
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,24 +12,40 @@ from .api.v1 import auth as auth_router
 from .api.v1 import rates as rates_router
 from .config import get_settings
 from .database import create_tables
+import os
+import logging
+
+try:
+    import sentry_sdk
+except Exception:
+    sentry_sdk = None
 
 # Load environment variables from .env file
 load_dotenv()
 
 settings = get_settings()
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # startup
+    if sentry_sdk and (settings.sentry.dsn or os.getenv("SENTRY_DSN")):
+        sentry_sdk.init(dsn=settings.sentry.dsn or os.getenv("SENTRY_DSN"))
+    # set base log level
+    logging.getLogger().setLevel(
+        getattr(logging, settings.log_level.upper(), logging.INFO))
+    create_tables()
+    yield
+    # shutdown
+    return
+
+
 app = FastAPI(
     title="Qeem Backend",
     description="AI-powered freelance rate calculator for Egyptian freelancers",
-    version="0.1.0"
+    version="0.1.0",
+    lifespan=lifespan,
 )
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize optional services on startup."""
-    # Create tables only in development
-    create_tables()
 
 
 @app.get("/health")

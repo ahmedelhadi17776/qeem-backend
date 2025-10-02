@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.main import app
-from app.database import get_db
+from app.database import get_db, engine as app_engine
 from app.models.base import Base
 
 # Create test database
@@ -15,7 +15,7 @@ engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={
 TestingSessionLocal = sessionmaker(
     autocommit=False, autoflush=False, bind=engine)
 
-# Create tables
+# Create tables for isolated test DB
 Base.metadata.create_all(bind=engine)
 
 

@@ -9,9 +9,11 @@ from app.models.invoice import Invoice, InvoiceStatus
 from app.models.contract import Contract, ContractStatus, ContractType
 from app.models.market_statistics import MarketStatistics
 from app.models.base import Base
+from uuid import uuid4
+from datetime import date
 
 # Create test database
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test_models.db"
+SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={
                        "check_same_thread": False})
 TestingSessionLocal = sessionmaker(
@@ -37,7 +39,7 @@ class TestUserModel:
     def test_create_user(self, db_session):
         """Test creating a user."""
         user = User(
-            email="test@example.com",
+            email=f"test_{uuid4().hex}@example.com",
             password_hash="hashed_password",
             role=UserRole.FREELANCER
         )
@@ -45,7 +47,7 @@ class TestUserModel:
         db_session.commit()
 
         assert user.id is not None
-        assert user.email == "test@example.com"
+        assert user.email.endswith("@example.com")
         assert user.role == UserRole.FREELANCER
         assert user.is_active is True
         assert user.is_verified is False
@@ -53,7 +55,7 @@ class TestUserModel:
     def test_user_profile_relationship(self, db_session):
         """Test user-profile relationship."""
         user = User(
-            email="test@example.com",
+            email=f"test_{uuid4().hex}@example.com",
             password_hash="hashed_password"
         )
         db_session.add(user)
@@ -73,7 +75,7 @@ class TestUserModel:
 
         assert user.profile is not None
         assert user.profile.first_name == "Test"
-        assert profile.user.email == "test@example.com"
+        assert profile.user.email.endswith("@example.com")
 
 
 class TestRateCalculationModel:
@@ -82,7 +84,7 @@ class TestRateCalculationModel:
     def test_create_rate_calculation(self, db_session):
         """Test creating a rate calculation."""
         user = User(
-            email="test@example.com",
+            email=f"test_{uuid4().hex}@example.com",
             password_hash="hashed_password"
         )
         db_session.add(user)
@@ -115,7 +117,7 @@ class TestInvoiceModel:
     def test_create_invoice(self, db_session):
         """Test creating an invoice."""
         user = User(
-            email="test@example.com",
+            email=f"test_{uuid4().hex}@example.com",
             password_hash="hashed_password"
         )
         db_session.add(user)
@@ -130,8 +132,8 @@ class TestInvoiceModel:
             tax_rate=0.14,
             tax_amount=140.0,
             total_amount=1140.0,
-            issue_date="2024-01-01",
-            due_date="2024-01-15",
+            issue_date=date(2024, 1, 1),
+            due_date=date(2024, 1, 15),
             status=InvoiceStatus.DRAFT
         )
         db_session.add(invoice)
@@ -149,7 +151,7 @@ class TestContractModel:
     def test_create_contract(self, db_session):
         """Test creating a contract."""
         user = User(
-            email="test@example.com",
+            email=f"test_{uuid4().hex}@example.com",
             password_hash="hashed_password"
         )
         db_session.add(user)
@@ -162,8 +164,8 @@ class TestContractModel:
             project_title="Web Development Project",
             contract_type=ContractType.HOURLY,
             hourly_rate=75.0,
-            start_date="2024-01-01",
-            end_date="2024-03-01",
+            start_date=date(2024, 1, 1),
+            end_date=date(2024, 3, 1),
             status=ContractStatus.DRAFT
         )
         db_session.add(contract)
@@ -181,7 +183,7 @@ class TestMarketStatisticsModel:
     def test_create_market_statistics(self, db_session):
         """Test creating market statistics."""
         stats = MarketStatistics(
-            date="2024-01-01",
+            date=date(2024, 1, 1),
             period_type="weekly",
             project_type="web_development",
             experience_level="mid",

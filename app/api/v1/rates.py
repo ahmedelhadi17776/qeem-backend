@@ -1,6 +1,4 @@
 from fastapi import APIRouter
-from fastapi import Depends
-from .. import __init__  # noqa: F401  # ensure package resolution
 from ...services.rates import calculate_compensation_tiers
 from ...schemas.rates import RateRequest, RateResponse
 

@@ -36,7 +36,8 @@ RUN apk add --no-cache \
     postgresql-libs \
     libstdc++ \
     libffi \
-    openssl
+    openssl \
+    curl
 
 # Copy built wheels & install production dependencies only
 COPY --from=builder /wheels /wheels
@@ -46,6 +47,9 @@ RUN pip install --no-cache-dir --no-index --find-links /wheels -r requirements.t
 # Copy only application code into runtime image
 COPY --from=builder /app/app ./app
 
+ENV UVICORN_HOST=0.0.0.0 \
+    UVICORN_PORT=8000
+
 EXPOSE 8000
 
 RUN adduser -D -g '' appuser \
@@ -53,4 +57,8 @@ RUN adduser -D -g '' appuser \
 
 USER appuser
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Basic container healthcheck hitting the health endpoint
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:${UVICORN_PORT}/health || exit 1
+
+CMD ["sh", "-c", "uvicorn app.main:app --host ${UVICORN_HOST} --port ${UVICORN_PORT} --proxy-headers"]

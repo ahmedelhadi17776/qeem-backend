@@ -22,6 +22,8 @@ class TestDatabaseConnection:
 
     def test_database_connection(self, engine):
         """Test basic database connection."""
+        if not os.getenv("DATABASE_URL", "").startswith("postgresql"):
+            pytest.skip("PostgreSQL not configured; skipping PG-specific test")
         try:
             with engine.connect() as conn:
                 result = conn.execute(text("SELECT 1"))
@@ -31,6 +33,8 @@ class TestDatabaseConnection:
 
     def test_postgresql_version(self, engine):
         """Test PostgreSQL version retrieval."""
+        if not os.getenv("DATABASE_URL", "").startswith("postgresql"):
+            pytest.skip("PostgreSQL not configured; skipping PG-specific test")
         try:
             with engine.connect() as conn:
                 result = conn.execute(text("SELECT version()"))
@@ -42,6 +46,8 @@ class TestDatabaseConnection:
 
     def test_database_exists(self, engine):
         """Test that the qeem database exists."""
+        if not os.getenv("DATABASE_URL", "").startswith("postgresql"):
+            pytest.skip("PostgreSQL not configured; skipping PG-specific test")
         try:
             with engine.connect() as conn:
                 result = conn.execute(text("SELECT current_database()"))

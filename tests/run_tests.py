@@ -18,6 +18,9 @@ def run_tests():
     backend_dir = Path(__file__).parent.parent
     os.chdir(backend_dir)
 
+    # Ensure a default SQLite URL to avoid requiring Postgres in CI/local by default
+    os.environ.setdefault("DATABASE_URL", "sqlite:///./test_ci.db")
+
     # Run pytest
     cmd = [
         sys.executable, "-m", "pytest",

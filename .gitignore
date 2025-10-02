@@ -151,9 +151,8 @@ cython_debug/
 *.sqlite
 *.sqlite3
 
-# Alembic
-alembic/versions/*.py
-!alembic/versions/.gitkeep
+# Alembic (track migrations)
+# Keep versions tracked; do not ignore migration files
 
 # Logs
 *.log
