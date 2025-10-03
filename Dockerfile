@@ -19,7 +19,7 @@ RUN apk add --no-cache \
 COPY requirements.txt ./
 
 # Build wheels for dependencies so runtime stage doesn't need compilers
-RUN pip wheel --no-cache-dir --no-deps --wheel-dir /wheels -r requirements.txt
+RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
 
 COPY app ./app
 
