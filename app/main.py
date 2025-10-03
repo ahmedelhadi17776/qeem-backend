@@ -13,12 +13,10 @@ from .api.v1 import rates as rates_router
 from .core.config import get_settings
 from .db.database import create_tables
 import os
-import logging
 from .schemas.common import HealthResponse
 from .core.logging import (
     configure_logging,
     configure_uvicorn_json_logging,
-    configure_uvicorn_text_logging,
 )
 
 try:
@@ -83,7 +81,8 @@ if settings.enable_rate_limiting:
     # type: ignore[no-redef]
     async def rate_limit_middleware(request: Request, call_next):
         redis = get_redis()
-        key = f"ratelimit:{request.client.host}:{request.url.path}"
+        client_host = request.client.host if request.client else "unknown"
+        key = f"ratelimit:{client_host}:{request.url.path}"
         current = redis.get(key)
         if current and int(current) >= 100:
             return Response(status_code=429, content="Rate limit exceeded")

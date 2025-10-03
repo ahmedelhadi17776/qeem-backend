@@ -31,18 +31,21 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Runtime libraries required by compiled dependencies (e.g., psycopg2)
+# Runtime libraries and build tools required by compiled dependencies
 RUN apk add --no-cache \
     postgresql-libs \
     libstdc++ \
     libffi \
     openssl \
-    curl
+    curl \
+    build-base \
+    python3-dev \
+    musl-dev \
+    linux-headers
 
-# Copy built wheels & install production dependencies only
-COPY --from=builder /wheels /wheels
+# Install production dependencies directly from PyPI
 COPY requirements.txt ./
-RUN pip install --no-cache-dir --no-index --find-links /wheels -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy only application code into runtime image
 COPY --from=builder /app/app ./app

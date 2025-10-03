@@ -9,11 +9,14 @@ import logging.config
 from typing import Literal
 
 
-def configure_logging(level: str, fmt: Literal["json", "text"] = "text", color: bool = False) -> None:
+def configure_logging(
+    level: str, fmt: Literal["json", "text"] = "text", color: bool = False
+) -> None:
     logger = logging.getLogger()
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
     handler = logging.StreamHandler()
     if fmt == "json":
+
         class JsonFormatter(logging.Formatter):
             # type: ignore[override]
             def format(self, record: logging.LogRecord) -> str:
@@ -27,6 +30,7 @@ def configure_logging(level: str, fmt: Literal["json", "text"] = "text", color: 
         handler.setFormatter(JsonFormatter())
     else:
         if color:
+
             class ColorFormatter(logging.Formatter):
                 COLORS = {
                     "DEBUG": "\033[36m",
@@ -45,8 +49,9 @@ def configure_logging(level: str, fmt: Literal["json", "text"] = "text", color: 
 
             handler.setFormatter(ColorFormatter())
         else:
-            handler.setFormatter(logging.Formatter(
-                "%(levelname)s %(name)s: %(message)s"))
+            handler.setFormatter(
+                logging.Formatter("%(levelname)s %(name)s: %(message)s")
+            )
 
     # reset handlers to avoid duplicates on reload
     logger.handlers = [handler]
@@ -86,9 +91,21 @@ def configure_uvicorn_json_logging(level: str) -> None:
                 }
             },
             "loggers": {
-                "uvicorn": {"handlers": ["json"], "level": level.upper(), "propagate": False},
-                "uvicorn.error": {"handlers": ["json"], "level": level.upper(), "propagate": False},
-                "uvicorn.access": {"handlers": ["json"], "level": level.upper(), "propagate": False},
+                "uvicorn": {
+                    "handlers": ["json"],
+                    "level": level.upper(),
+                    "propagate": False,
+                },
+                "uvicorn.error": {
+                    "handlers": ["json"],
+                    "level": level.upper(),
+                    "propagate": False,
+                },
+                "uvicorn.access": {
+                    "handlers": ["json"],
+                    "level": level.upper(),
+                    "propagate": False,
+                },
             },
         }
     )
@@ -121,7 +138,9 @@ def configure_uvicorn_text_logging(level: str, color: bool = True) -> None:
             "version": 1,
             "disable_existing_loggers": False,
             "formatters": {
-                "text": {"()": ColorFormatter if color else PlainFormatter},
+                "text": {
+                    "()": ColorFormatter if color else PlainFormatter
+                },
             },
             "handlers": {
                 "text": {
@@ -131,9 +150,21 @@ def configure_uvicorn_text_logging(level: str, color: bool = True) -> None:
                 }
             },
             "loggers": {
-                "uvicorn": {"handlers": ["text"], "level": level.upper(), "propagate": False},
-                "uvicorn.error": {"handlers": ["text"], "level": level.upper(), "propagate": False},
-                "uvicorn.access": {"handlers": ["text"], "level": level.upper(), "propagate": False},
+                "uvicorn": {
+                    "handlers": ["text"],
+                    "level": level.upper(),
+                    "propagate": False,
+                },
+                "uvicorn.error": {
+                    "handlers": ["text"],
+                    "level": level.upper(),
+                    "propagate": False,
+                },
+                "uvicorn.access": {
+                    "handlers": ["text"],
+                    "level": level.upper(),
+                    "propagate": False,
+                },
             },
         }
     )

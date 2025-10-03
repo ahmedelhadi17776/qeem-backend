@@ -9,7 +9,7 @@ minimum, competitive, and premium hourly rates in EGP based on:
  - Urgency (normal vs rush)
 """
 
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 from sqlalchemy.orm import Session
 
 from ..schemas.rates import RateRequest
@@ -80,7 +80,9 @@ def _urgency_multiplier(urgency: str) -> float:
     return 1.15 if urgency == "rush" else 1.0
 
 
-def calculate_compensation_tiers(payload: RateRequest, db: Optional[Session] = None, user_id: Optional[int] = None) -> Dict[str, float]:
+def calculate_compensation_tiers(
+    payload: RateRequest, db: Optional[Session] = None, user_id: Optional[int] = None
+) -> Dict[str, Union[float, str]]:
     """Compute hourly rate tiers in EGP.
 
     Strategy:

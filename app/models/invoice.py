@@ -1,9 +1,7 @@
 """Invoice model."""
 
 from enum import Enum
-from typing import Optional
-
-from sqlalchemy import Column, ForeignKey, String, Text, Float, Boolean, Date, Integer
+from sqlalchemy import Column, ForeignKey, String, Text, Float, Date, Integer
 from sqlalchemy.orm import relationship
 
 from .base import Base, IDMixin, TimestampMixin
@@ -11,6 +9,7 @@ from .base import Base, IDMixin, TimestampMixin
 
 class InvoiceStatus(str, Enum):
     """Invoice status options."""
+
     DRAFT = "draft"
     SENT = "sent"
     PAID = "paid"
@@ -23,8 +22,9 @@ class Invoice(Base, IDMixin, TimestampMixin):
 
     __tablename__ = "invoices"
 
-    user_id = Column(Integer, ForeignKey(
-        "users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
 
     # Invoice Details
     invoice_number = Column(String(50), unique=True,

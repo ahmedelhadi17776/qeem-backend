@@ -1,7 +1,6 @@
 """Rate calculation models."""
 
 from enum import Enum
-from typing import Optional
 
 from sqlalchemy import Column, ForeignKey, Integer, String, Text, Float, Boolean
 from sqlalchemy.orm import relationship
@@ -11,6 +10,7 @@ from .base import Base, IDMixin, TimestampMixin
 
 class ProjectType(str, Enum):
     """Types of freelance projects."""
+
     WEB_DEVELOPMENT = "web_development"
     MOBILE_DEVELOPMENT = "mobile_development"
     DESIGN = "design"
@@ -23,6 +23,7 @@ class ProjectType(str, Enum):
 
 class ProjectComplexity(str, Enum):
     """Project complexity levels."""
+
     SIMPLE = "simple"
     MODERATE = "moderate"
     COMPLEX = "complex"
@@ -34,8 +35,9 @@ class RateCalculation(Base, IDMixin, TimestampMixin):
 
     __tablename__ = "rate_calculations"
 
-    user_id = Column(Integer, ForeignKey(
-        "users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
 
     # Input Parameters
     project_type = Column(String(50), nullable=False)

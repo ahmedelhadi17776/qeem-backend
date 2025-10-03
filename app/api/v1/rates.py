@@ -13,7 +13,9 @@ async def get_history() -> RateHistoryResponse:
 
 
 @router.post("/calculate", response_model=RateResponse)
-async def calculate_rate(payload: RateRequest, db: Session = Depends(get_db)) -> RateResponse:
+async def calculate_rate(
+    payload: RateRequest, db: Session = Depends(get_db)
+) -> RateResponse:
     """Calculate rate tiers based on a simple rule-based engine.
 
     This endpoint returns minimum, competitive, and premium rates in EGP.
@@ -21,4 +23,14 @@ async def calculate_rate(payload: RateRequest, db: Session = Depends(get_db)) ->
     # TODO: Get user_id from authentication when auth is implemented
     user_id = None  # Will be replaced with actual user authentication
     tiers = calculate_compensation_tiers(payload, db=db, user_id=user_id)
-    return RateResponse(**tiers)
+    return RateResponse(
+        minimum_rate=tiers["minimum_rate"],
+        competitive_rate=tiers["competitive_rate"],
+        premium_rate=tiers["premium_rate"],
+        currency=tiers["currency"],
+        method=tiers["method"],
+        rationale=(
+            "Rule-based calculation using project complexity, experience, "
+            "skills, client region, and urgency."
+        )
+    )

@@ -1,7 +1,20 @@
 fastapi==0.116.2
+starlette>=0.47.2             # Fixed security vulnerability
 uvicorn[standard]==0.30.6     # if no breaking changes; or bump minor
+click>=7.0                    # required by uvicorn
+h11>=0.8                      # required by uvicorn
+annotated-types>=0.6.0       # required by pydantic
+pydantic-core==2.23.4        # required by pydantic
+greenlet!=0.4.17             # required by sqlalchemy
+Mako                         # required by alembic
+anyio                        # required by httpx
+certifi                      # required by httpx
+httpcore==1.*                # required by httpx
+idna                         # required by httpx
+sniffio                      # required by httpx
 pydantic==2.9.2               # or newer 2.x depending compatibility
 pydantic-settings>=2.4,<3.0   # settings management for Pydantic v2
+typing-extensions>=4.8.0      # required by FastAPI and other dependencies
 sqlalchemy==2.0.35            # or newer 2.x patch
 alembic==1.13.2               # or newer 1.x patch
 psycopg2-binary==2.9.9        # or latest safe binary build
@@ -11,16 +24,18 @@ httpx==0.27.2                 # or latest stable
 celery==5.5.3                 # bump to latest 5.x
 sentry-sdk==2.35.1            # bump to latest 2.x
 bcrypt==4.1.2
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]>=3.4.0  # Fixed security vulnerability
+cryptography>=42.0.0               # Replace ecdsa with maintained alternative
 passlib[bcrypt]==1.7.4
-pymongo[srv]==4.6.1           # MongoDB Atlas connection
+pymongo[srv]>=4.6.3           # Fixed security vulnerability
 email-validator==2.1.0        # Pydantic email validation
-python-multipart==0.0.6       # FastAPI form data parsing
+python-multipart>=0.0.18      # Fixed security vulnerability
 pytest==8.2.2                # Testing framework
 pytest-cov==5.0.0            # Coverage reporting
 pytest-asyncio==0.23.5       # Async testing support
 black==24.4.2                # Code formatting
 flake8==7.0.0                # Linting
 mypy==1.8.0                  # Type checking
-bandit==1.7.5                # Security scanning
-safety==3.0.1                # Dependency vulnerability scanning
+bandit>=1.7.7                # Fixed security vulnerability
+pbr>=5.11.0                  # Required by bandit
+safety==3.6.2                # Dependency vulnerability scanning (latest version with Pydantic v2 support)

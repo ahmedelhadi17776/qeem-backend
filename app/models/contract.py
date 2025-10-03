@@ -1,7 +1,6 @@
 """Contract model."""
 
 from enum import Enum
-from typing import Optional
 
 from sqlalchemy import Column, ForeignKey, String, Text, Float, Boolean, Date, Integer
 from sqlalchemy.orm import relationship
@@ -11,6 +10,7 @@ from .base import Base, IDMixin, TimestampMixin
 
 class ContractStatus(str, Enum):
     """Contract status options."""
+
     DRAFT = "draft"
     PENDING_REVIEW = "pending_review"
     ACTIVE = "active"
@@ -20,6 +20,7 @@ class ContractStatus(str, Enum):
 
 class ContractType(str, Enum):
     """Contract type options."""
+
     HOURLY = "hourly"
     FIXED_PRICE = "fixed_price"
     RETAINER = "retainer"
@@ -31,8 +32,9 @@ class Contract(Base, IDMixin, TimestampMixin):
 
     __tablename__ = "contracts"
 
-    user_id = Column(Integer, ForeignKey(
-        "users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
 
     # Contract Details
     contract_number = Column(String(50), unique=True,

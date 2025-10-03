@@ -1,6 +1,6 @@
 """Market statistics model for ML data."""
 
-from sqlalchemy import Column, String, Float, Integer, Date, Text, JSON
+from sqlalchemy import Column, String, Float, Integer, Date, JSON
 from sqlalchemy.dialects.postgresql import JSONB
 
 from .base import Base, IDMixin, TimestampMixin
@@ -13,8 +13,9 @@ class MarketStatistics(Base, IDMixin, TimestampMixin):
 
     # Time Period
     date = Column(Date, nullable=False, index=True)
-    period_type = Column(String(20), default="weekly",
-                         nullable=False)  # daily, weekly, monthly
+    period_type = Column(
+        String(20), default="weekly", nullable=False
+    )  # daily, weekly, monthly
 
     # Market Segment
     project_type = Column(String(50), nullable=False, index=True)

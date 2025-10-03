@@ -1,6 +1,6 @@
 """FastAPI dependencies for database sessions and authentication."""
 
-from typing import Generator, Optional
+from typing import Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -14,7 +14,7 @@ security = HTTPBearer()
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> Optional[dict]:
     """Get current authenticated user from JWT token.
 
@@ -47,7 +47,7 @@ def get_current_user(
 
 
 def get_current_active_user(
-    current_user: Optional[dict] = Depends(get_current_user)
+    current_user: Optional[dict] = Depends(get_current_user),
 ) -> dict:
     """Get current active user (non-disabled).
 
@@ -62,8 +62,7 @@ def get_current_active_user(
     """
     if current_user is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
         )
 
     # TODO: Check if user is active/not disabled

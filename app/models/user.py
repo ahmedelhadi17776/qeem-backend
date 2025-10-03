@@ -1,7 +1,6 @@
 """User and UserProfile models."""
 
 from enum import Enum
-from typing import Optional
 
 from sqlalchemy import Boolean, Column, ForeignKey, String, Text, Integer
 from sqlalchemy.orm import relationship
@@ -11,6 +10,7 @@ from .base import Base, IDMixin, TimestampMixin
 
 class UserRole(str, Enum):
     """User roles in the system."""
+
     FREELANCER = "freelancer"
     ADMIN = "admin"
 
@@ -27,14 +27,21 @@ class User(Base, IDMixin, TimestampMixin):
     role = Column(String(50), default=UserRole.FREELANCER, nullable=False)
 
     # Relationships
-    profile = relationship("UserProfile", back_populates="user",
-                           uselist=False, cascade="all, delete-orphan")
+    profile = relationship(
+        "UserProfile",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
     rate_calculations = relationship(
-        "RateCalculation", back_populates="user", cascade="all, delete-orphan")
+        "RateCalculation", back_populates="user", cascade="all, delete-orphan"
+    )
     invoices = relationship(
-        "Invoice", back_populates="user", cascade="all, delete-orphan")
+        "Invoice", back_populates="user", cascade="all, delete-orphan"
+    )
     contracts = relationship(
-        "Contract", back_populates="user", cascade="all, delete-orphan")
+        "Contract", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class UserProfile(Base, IDMixin, TimestampMixin):
@@ -42,8 +49,9 @@ class UserProfile(Base, IDMixin, TimestampMixin):
 
     __tablename__ = "user_profiles"
 
-    user_id = Column(Integer, ForeignKey(
-        "users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
 
     # Personal Information
     first_name = Column(String(100), nullable=True)

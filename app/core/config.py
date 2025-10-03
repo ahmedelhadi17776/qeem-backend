@@ -21,7 +21,8 @@ class SentrySettings(BaseModel):
 
 class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore")
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
     # Environment
     environment: str = Field(default="development", alias="ENVIRONMENT")
@@ -30,22 +31,28 @@ class AppSettings(BaseSettings):
 
     # Core URLs
     database_url: str = Field(
-        default="postgresql://elhadi:test123@localhost:5432/qeem", alias="DATABASE_URL")
+        default="postgresql://elhadi:test123@localhost:5432/qeem",
+        alias="DATABASE_URL"
+    )
     redis_url: str = Field(default="redis://localhost:6379", alias="REDIS_URL")
 
     # CORS
     cors_origins_str: str = Field(
-        default="http://localhost:3000,http://127.0.0.1:3000", alias="CORS_ORIGINS"
+        default="http://localhost:3000,http://127.0.0.1:3000",
+        alias="CORS_ORIGINS"
     )
     cors_origins: List[str] = Field(default_factory=list)
 
     # Feature flags
     enable_ml_predictions: bool = Field(
-        default=False, alias="ENABLE_ML_PREDICTIONS")
+        default=False, alias="ENABLE_ML_PREDICTIONS"
+    )
     enable_ai_negotiation: bool = Field(
-        default=False, alias="ENABLE_AI_NEGOTIATION")
+        default=False, alias="ENABLE_AI_NEGOTIATION"
+    )
     enable_rate_limiting: bool = Field(
-        default=False, alias="RATE_LIMITING_ENABLED")
+        default=False, alias="RATE_LIMITING_ENABLED"
+    )
 
     # Nested
     security: SecuritySettings = SecuritySettings()
@@ -62,7 +69,9 @@ class AppSettings(BaseSettings):
             except json.JSONDecodeError:
                 pass
             self.cors_origins = [
-                origin.strip() for origin in self.cors_origins_str.split(",") if origin.strip()
+                origin.strip()
+                for origin in self.cors_origins_str.split(",")
+                if origin.strip()
             ]
         return self
 
