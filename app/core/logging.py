@@ -59,10 +59,6 @@ def configure_logging(
 
 def configure_uvicorn_json_logging(level: str) -> None:
     """Route uvicorn loggers through the JSON formatter."""
-    json_formatter = {
-        "()": "logging.Formatter",
-        "format": "%(levelname)s %(name)s: %(message)s",
-    }
 
     class JsonFormatter(logging.Formatter):
         # type: ignore[override]
