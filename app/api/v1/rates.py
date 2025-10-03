@@ -1,3 +1,4 @@
+from typing import cast, Literal
 from fastapi import APIRouter, Depends
 from ...services.rates import calculate_compensation_tiers
 from ...schemas.rates import RateRequest, RateResponse, RateHistoryResponse
@@ -24,11 +25,11 @@ async def calculate_rate(
     user_id = None  # Will be replaced with actual user authentication
     tiers = calculate_compensation_tiers(payload, db=db, user_id=user_id)
     return RateResponse(
-        minimum_rate=tiers["minimum_rate"],
-        competitive_rate=tiers["competitive_rate"],
-        premium_rate=tiers["premium_rate"],
-        currency=tiers["currency"],
-        method=tiers["method"],
+        minimum_rate=float(tiers["minimum_rate"]),
+        competitive_rate=float(tiers["competitive_rate"]),
+        premium_rate=float(tiers["premium_rate"]),
+        currency=cast("Literal['EGP']", tiers["currency"]),
+        method=cast("Literal['rule_based']", tiers["method"]),
         rationale=(
             "Rule-based calculation using project complexity, experience, "
             "skills, client region, and urgency."

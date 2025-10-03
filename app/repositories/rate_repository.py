@@ -71,7 +71,7 @@ class RateRepository:
         """Set/unset a rate calculation as favorite."""
         calculation = self.get_by_id(calculation_id)
         if calculation and calculation.user_id == user_id:
-            calculation.is_favorite = is_favorite
+            calculation.is_favorite = is_favorite  # type: ignore[assignment]
             self.db.commit()
             self.db.refresh(calculation)
             return calculation

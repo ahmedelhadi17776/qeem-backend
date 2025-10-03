@@ -22,7 +22,7 @@ from .core.logging import (
 try:
     import sentry_sdk  # type: ignore[import-not-found]
 except Exception:
-    sentry_sdk = None
+    sentry_sdk = None  # type: ignore[assignment]
 
 # Load environment variables from .env file
 load_dotenv()
@@ -84,7 +84,7 @@ if settings.enable_rate_limiting:
         client_host = request.client.host if request.client else "unknown"
         key = f"ratelimit:{client_host}:{request.url.path}"
         current = redis.get(key)
-        if current and int(current) >= 100:
+        if current and int(str(current)) >= 100:
             return Response(status_code=429, content="Rate limit exceeded")
         if current:
             redis.incr(key)

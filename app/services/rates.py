@@ -105,7 +105,7 @@ def calculate_compensation_tiers(
     competitive_rate = round(value)
     premium_rate = round(value * 1.3)
 
-    result = {
+    result: Dict[str, Union[float, str]] = {
         "minimum_rate": float(minimum_rate),
         "competitive_rate": float(competitive_rate),
         "premium_rate": float(premium_rate),
