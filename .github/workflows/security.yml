@@ -70,9 +70,11 @@ jobs:
                   exit-code: "1"
 
             - name: Upload Trivy scan results
+              if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
               uses: github/codeql-action/upload-sarif@v3
               with:
                   sarif_file: "backend-trivy-results.sarif"
+              continue-on-error: true
 
     secrets-scan:
         if: github.event_name == 'pull_request'

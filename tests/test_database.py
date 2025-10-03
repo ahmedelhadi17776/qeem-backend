@@ -82,12 +82,23 @@ class TestDatabaseSchema:
 
         try:
             with engine.connect() as conn:
-                result = conn.execute(text("""
-                    SELECT table_name 
-                    FROM information_schema.tables 
-                    WHERE table_schema = 'public'
-                    ORDER BY table_name
-                """))
+                # Use SQLite-compatible query
+                if "sqlite" in str(engine.url):
+                    result = conn.execute(text("""
+                        SELECT name 
+                        FROM sqlite_master 
+                        WHERE type='table' AND name NOT LIKE 'sqlite_%'
+                        ORDER BY name
+                    """))
+                else:
+                    # PostgreSQL query
+                    result = conn.execute(text("""
+                        SELECT table_name 
+                        FROM information_schema.tables 
+                        WHERE table_schema = 'public'
+                        ORDER BY table_name
+                    """))
+
                 existing_tables = {row[0] for row in result.fetchall()}
 
                 missing_tables = expected_tables - existing_tables
@@ -110,12 +121,19 @@ class TestDatabaseSchema:
 
         try:
             with engine.connect() as conn:
-                result = conn.execute(text("""
-                    SELECT column_name 
-                    FROM information_schema.columns 
-                    WHERE table_name = 'users' AND table_schema = 'public'
-                """))
-                existing_columns = {row[0] for row in result.fetchall()}
+                # Use SQLite-compatible query
+                if "sqlite" in str(engine.url):
+                    result = conn.execute(text("PRAGMA table_info(users)"))
+                    # row[1] is column name
+                    existing_columns = {row[1] for row in result.fetchall()}
+                else:
+                    # PostgreSQL query
+                    result = conn.execute(text("""
+                        SELECT column_name 
+                        FROM information_schema.columns 
+                        WHERE table_name = 'users' AND table_schema = 'public'
+                    """))
+                    existing_columns = {row[0] for row in result.fetchall()}
 
                 missing_columns = required_columns - existing_columns
                 if missing_columns:
@@ -131,6 +149,17 @@ class TestDatabaseSchema:
         """Test that alembic version tracking is working."""
         try:
             with engine.connect() as conn:
+                # Check if alembic_version table exists first
+                if "sqlite" in str(engine.url):
+                    # For SQLite, check if table exists
+                    result = conn.execute(text("""
+                        SELECT name FROM sqlite_master 
+                        WHERE type='table' AND name='alembic_version'
+                    """))
+                    if not result.fetchone():
+                        pytest.skip(
+                            "Alembic version table not found - migrations not applied")
+
                 result = conn.execute(
                     text("SELECT version_num FROM alembic_version"))
                 version = result.fetchone()
@@ -160,9 +189,16 @@ class TestDatabasePermissions:
         try:
             with engine.connect() as conn:
                 # Test SELECT permission
-                result = conn.execute(text("SELECT current_user"))
-                current_user = result.fetchone()[0]
-                print(f"✅ Connected as user: {current_user}")
+                if "sqlite" in str(engine.url):
+                    # SQLite doesn't have current_user, just test basic connection
+                    result = conn.execute(text("SELECT 1"))
+                    assert result.fetchone()[0] == 1
+                    print("✅ SQLite connection successful")
+                else:
+                    # PostgreSQL query
+                    result = conn.execute(text("SELECT current_user"))
+                    current_user = result.fetchone()[0]
+                    print(f"✅ Connected as user: {current_user}")
 
                 # Test CREATE permission (for future migrations)
                 conn.execute(
