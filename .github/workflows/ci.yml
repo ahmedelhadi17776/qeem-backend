@@ -6,6 +6,10 @@ on:
   push:
     branches: [develop, main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -78,7 +82,16 @@ jobs:
 
       - name: Test Docker image
         run: |
-          docker run --rm -d --name qeem-test -p 8000:8000 qeem-backend:test
-          sleep 10
-          curl -f http://localhost:8000/health || exit 1
+          docker run --rm -d --name qeem-test -p 8000:8000 \
+            -e ENVIRONMENT=ci \
+            -e DATABASE_URL=sqlite:///./test_ci.db \
+            qeem-backend:test
+          # wait up to 30s for readiness
+          for i in {1..30}; do
+            if curl -sf http://localhost:8000/health > /dev/null; then
+              echo "Service is up"; break
+            fi
+            sleep 1
+          done
+          curl -f http://localhost:8000/health
           docker stop qeem-test

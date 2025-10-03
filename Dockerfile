@@ -31,23 +31,20 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Runtime libraries and build tools required by compiled dependencies
+# Runtime libs only (no compilers)
 RUN apk add --no-cache \
     postgresql-libs \
     libstdc++ \
     libffi \
     openssl \
-    curl \
-    build-base \
-    python3-dev \
-    musl-dev \
-    linux-headers
+    curl
 
-# Install production dependencies directly from PyPI
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+# Install dependencies from prebuilt wheels
+COPY --from=builder /wheels /wheels
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir --find-links=/wheels -r /app/requirements.txt
 
-# Copy only application code into runtime image
+# Copy app code
 COPY --from=builder /app/app ./app
 
 ENV UVICORN_HOST=0.0.0.0 \
