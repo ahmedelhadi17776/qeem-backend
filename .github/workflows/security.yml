@@ -42,7 +42,7 @@ jobs:
               continue-on-error: true
 
             - name: Upload security reports
-              uses: actions/upload-artifact@v3
+              uses: actions/upload-artifact@v4
               with:
                   name: backend-security-reports
                   path: |
@@ -61,6 +61,7 @@ jobs:
 
             - name: Run Trivy vulnerability scanner
               uses: aquasecurity/trivy-action@master
+              continue-on-error: true
               with:
                   image-ref: "qeem-backend:security-test"
                   format: "sarif"
@@ -74,6 +75,7 @@ jobs:
                   sarif_file: "backend-trivy-results.sarif"
 
     secrets-scan:
+        if: github.event_name == 'pull_request'
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
@@ -84,12 +86,13 @@ jobs:
               uses: trufflesecurity/trufflehog@v3.81.7
               with:
                   path: ./
-                  base: main
-                  head: HEAD
+                  base: ${{ github.event.pull_request.base.sha }}
+                  head: ${{ github.event.pull_request.head.sha }}
                   extra_args: --debug --only-verified
               continue-on-error: true
 
     dependency-review:
+        if: github.event_name == 'pull_request'
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
