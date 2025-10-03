@@ -66,8 +66,7 @@ class UserRepository:
 
     def list_active_users(self, skip: int = 0, limit: int = 100) -> List[User]:
         """List active users with pagination."""
-        stmt = select(User).where(
-            User.is_active.is_(True)).offset(skip).limit(limit)
+        stmt = select(User).where(User.is_active.is_(True)).offset(skip).limit(limit)
         return list(self.db.execute(stmt).scalars().all())
 
     def count_users(self) -> int:

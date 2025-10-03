@@ -54,8 +54,7 @@ class RateCalculation(Base, IDMixin, TimestampMixin):
 
     # Additional Data
     # rule_based, ml_prediction
-    calculation_method = Column(
-        String(50), default="rule_based", nullable=False)
+    calculation_method = Column(String(50), default="rule_based", nullable=False)
     confidence_score = Column(Float, nullable=True)  # for ML predictions
     reasoning = Column(Text, nullable=True)  # JSON string with breakdown
 

@@ -32,5 +32,5 @@ async def calculate_rate(
         rationale=(
             "Rule-based calculation using project complexity, experience, "
             "skills, client region, and urgency."
-        )
+        ),
     )

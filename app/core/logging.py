@@ -138,9 +138,7 @@ def configure_uvicorn_text_logging(level: str, color: bool = True) -> None:
             "version": 1,
             "disable_existing_loggers": False,
             "formatters": {
-                "text": {
-                    "()": ColorFormatter if color else PlainFormatter
-                },
+                "text": {"()": ColorFormatter if color else PlainFormatter},
             },
             "handlers": {
                 "text": {

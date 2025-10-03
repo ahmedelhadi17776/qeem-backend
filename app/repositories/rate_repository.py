@@ -59,7 +59,7 @@ class RateRepository:
             select(RateCalculation)
             .where(
                 RateCalculation.user_id == user_id,
-                RateCalculation.is_favorite.is_(True)
+                RateCalculation.is_favorite.is_(True),
             )
             .order_by(desc(RateCalculation.created_at))
         )
@@ -92,8 +92,7 @@ class RateRepository:
 
     def count_by_user(self, user_id: int) -> int:
         """Count rate calculations for a user."""
-        stmt = select(RateCalculation).where(
-            RateCalculation.user_id == user_id)
+        stmt = select(RateCalculation).where(RateCalculation.user_id == user_id)
         return len(list(self.db.execute(stmt).scalars().all()))
 
     def get_recent_calculations(self, limit: int = 10) -> List[RateCalculation]:

@@ -27,8 +27,7 @@ class Invoice(Base, IDMixin, TimestampMixin):
     )
 
     # Invoice Details
-    invoice_number = Column(String(50), unique=True,
-                            nullable=False, index=True)
+    invoice_number = Column(String(50), unique=True, nullable=False, index=True)
     client_name = Column(String(200), nullable=False)
     client_email = Column(String(255), nullable=True)
     client_address = Column(Text, nullable=True)

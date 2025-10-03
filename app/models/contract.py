@@ -37,8 +37,7 @@ class Contract(Base, IDMixin, TimestampMixin):
     )
 
     # Contract Details
-    contract_number = Column(String(50), unique=True,
-                             nullable=False, index=True)
+    contract_number = Column(String(50), unique=True, nullable=False, index=True)
     client_name = Column(String(200), nullable=False)
     client_email = Column(String(255), nullable=True)
     project_title = Column(String(300), nullable=False)

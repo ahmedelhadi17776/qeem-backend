@@ -19,8 +19,7 @@ class MarketStatistics(Base, IDMixin, TimestampMixin):
 
     # Market Segment
     project_type = Column(String(50), nullable=False, index=True)
-    experience_level = Column(
-        String(20), nullable=False)  # junior, mid, senior
+    experience_level = Column(String(20), nullable=False)  # junior, mid, senior
     location = Column(String(100), nullable=False, index=True)
 
     # Statistics
@@ -42,5 +41,4 @@ class MarketStatistics(Base, IDMixin, TimestampMixin):
     market_trend = Column(String(20), nullable=True)
 
     # Raw Data Reference: JSON on SQLite, JSONB on Postgres
-    raw_data_ids = Column(JSON().with_variant(
-        JSONB, "postgresql"), nullable=True)
+    raw_data_ids = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)

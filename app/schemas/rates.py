@@ -27,10 +27,8 @@ class RateRequest(BaseModel):
     skills_count: Annotated[int, Field(ge=0, le=100)] = Field(
         ..., description="Number of relevant skills"
     )
-    location: str = Field(...,
-                          description="Primary work location (city, country)")
-    client_region: Literal["egypt", "mena",
-                           "europe", "usa", "global"] = "egypt"
+    location: str = Field(..., description="Primary work location (city, country)")
+    client_region: Literal["egypt", "mena", "europe", "usa", "global"] = "egypt"
     urgency: Literal["normal", "rush"] = "normal"
 
 

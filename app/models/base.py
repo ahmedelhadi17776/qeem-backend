@@ -1,6 +1,5 @@
 """Base database configuration and models."""
 
-
 from sqlalchemy import Column, DateTime, Integer
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql import func
