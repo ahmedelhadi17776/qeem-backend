@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 import bcrypt
 from jose import JWTError, jwt
 
-from ..config import get_settings
+from .config import get_settings
 
 settings = get_settings()
 
@@ -25,7 +25,8 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def create_access_token(subject: str, expires_delta: Optional[timedelta] = None, extra_claims: Optional[Dict[str, Any]] = None) -> str:
     expire = datetime.now(tz=timezone.utc) + (
-        expires_delta if expires_delta is not None else timedelta(days=settings.security.jwt_expires_in_days)
+        expires_delta if expires_delta is not None else timedelta(
+            days=settings.security.jwt_expires_in_days)
     )
     to_encode: Dict[str, Any] = {"sub": subject, "exp": expire}
     if extra_claims:
@@ -38,5 +39,3 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
         return jwt.decode(token, settings.security.jwt_secret, algorithms=[settings.security.jwt_algorithm])
     except JWTError:
         return None
-
-

@@ -9,9 +9,11 @@ minimum, competitive, and premium hourly rates in EGP based on:
  - Urgency (normal vs rush)
 """
 
-from typing import Dict
+from typing import Dict, Optional
+from sqlalchemy.orm import Session
 
 from ..schemas.rates import RateRequest
+from ..repositories.rate_repository import RateRepository
 
 
 def _base_rate_for_project_type(project_type: str) -> float:
@@ -78,7 +80,7 @@ def _urgency_multiplier(urgency: str) -> float:
     return 1.15 if urgency == "rush" else 1.0
 
 
-def calculate_compensation_tiers(payload: RateRequest) -> Dict[str, float]:
+def calculate_compensation_tiers(payload: RateRequest, db: Optional[Session] = None, user_id: Optional[int] = None) -> Dict[str, float]:
     """Compute hourly rate tiers in EGP.
 
     Strategy:
@@ -101,10 +103,30 @@ def calculate_compensation_tiers(payload: RateRequest) -> Dict[str, float]:
     competitive_rate = round(value)
     premium_rate = round(value * 1.3)
 
-    return {
+    result = {
         "minimum_rate": float(minimum_rate),
         "competitive_rate": float(competitive_rate),
         "premium_rate": float(premium_rate),
         "currency": "EGP",
         "method": "rule_based",
     }
+
+    # Save calculation to database if session and user_id are provided
+    if db and user_id:
+        rate_repo = RateRepository(db)
+        calculation_data = {
+            "user_id": user_id,
+            "project_type": payload.project_type,
+            "project_complexity": payload.project_complexity,
+            "estimated_hours": payload.estimated_hours,
+            "experience_years": payload.experience_years,
+            "skills_count": payload.skills_count,
+            "location": payload.location,
+            "minimum_rate": result["minimum_rate"],
+            "competitive_rate": result["competitive_rate"],
+            "premium_rate": result["premium_rate"],
+            "calculation_method": "rule_based",
+        }
+        rate_repo.create(calculation_data)
+
+    return result

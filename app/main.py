@@ -10,19 +10,19 @@ from starlette.responses import Response
 from .api.v1 import api_router
 from .api.v1 import auth as auth_router
 from .api.v1 import rates as rates_router
-from .config import get_settings
-from .database import create_tables
+from .core.config import get_settings
+from .db.database import create_tables
 import os
 import logging
 from .schemas.common import HealthResponse
-from .logging_config import (
+from .core.logging import (
     configure_logging,
     configure_uvicorn_json_logging,
     configure_uvicorn_text_logging,
 )
 
 try:
-    import sentry_sdk # type: ignore[import-not-found]
+    import sentry_sdk  # type: ignore[import-not-found]
 except Exception:
     sentry_sdk = None
 

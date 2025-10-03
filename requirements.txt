@@ -16,3 +16,11 @@ passlib[bcrypt]==1.7.4
 pymongo[srv]==4.6.1           # MongoDB Atlas connection
 email-validator==2.1.0        # Pydantic email validation
 python-multipart==0.0.6       # FastAPI form data parsing
+pytest==8.2.2                # Testing framework
+pytest-cov==5.0.0            # Coverage reporting
+pytest-asyncio==0.23.5       # Async testing support
+black==24.4.2                # Code formatting
+flake8==7.0.0                # Linting
+mypy==1.8.0                  # Type checking
+bandit==1.7.5                # Security scanning
+safety==3.0.1                # Dependency vulnerability scanning

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from ...services.rates import calculate_compensation_tiers
 from ...schemas.rates import RateRequest, RateResponse, RateHistoryResponse
-from ...database import get_db
+from ..deps import get_db
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/rates", tags=["rates"])
@@ -18,5 +18,7 @@ async def calculate_rate(payload: RateRequest, db: Session = Depends(get_db)) ->
 
     This endpoint returns minimum, competitive, and premium rates in EGP.
     """
-    tiers = calculate_compensation_tiers(payload)
+    # TODO: Get user_id from authentication when auth is implemented
+    user_id = None  # Will be replaced with actual user authentication
+    tiers = calculate_compensation_tiers(payload, db=db, user_id=user_id)
     return RateResponse(**tiers)

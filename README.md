@@ -195,11 +195,23 @@ alembic downgrade -1
 ```
 qeem-backend/
 ├── app/
-│   ├── api/v1/          # API routes and endpoints
-│   ├── models/           # SQLAlchemy database models
-│   ├── schemas/          # Pydantic request/response schemas
-│   ├── services/         # Business logic layer
-│   ├── auth/            # Authentication utilities
+│   ├── api/             # API layer
+│   │   ├── deps.py      # FastAPI dependencies (DB, auth)
+│   │   └── v1/          # API routes and endpoints
+│   ├── core/            # Core application components
+│   │   ├── config.py    # Application configuration
+│   │   ├── security.py  # JWT and password utilities
+│   │   └── logging.py   # Logging configuration
+│   ├── db/              # Database layer
+│   │   └── database.py  # Database session management
+│   ├── infra/           # Infrastructure components
+│   │   └── redis.py     # Redis client factory
+│   ├── models/          # SQLAlchemy database models
+│   ├── repositories/    # Data access layer
+│   │   ├── user_repository.py
+│   │   └── rate_repository.py
+│   ├── schemas/         # Pydantic request/response schemas
+│   ├── services/        # Business logic layer
 │   └── main.py          # FastAPI application entry point
 ├── alembic/             # Database migrations
 ├── tests/               # Test suite
