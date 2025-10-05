@@ -143,7 +143,7 @@ class TestUserLogin:
         assert response.status_code == 200
         data = response.json()
         assert "access_token" in data
-        assert data["token_type"] == "bearer"
+        assert data["token_type"] == "Bearer"
         assert "expires_in" in data
         assert data["expires_in"] > 0
 
