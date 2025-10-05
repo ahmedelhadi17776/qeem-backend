@@ -49,6 +49,7 @@ jobs:
           file: ./coverage.xml
           flags: backend
           name: backend-coverage
+          fail_ci_if_error: false
 
   security:
     runs-on: ubuntu-latest

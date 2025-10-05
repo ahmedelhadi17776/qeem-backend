@@ -37,7 +37,7 @@ class RateResponse(BaseModel):
     competitive_rate: Annotated[float, Field(ge=0)]  # EGP/hour
     premium_rate: Annotated[float, Field(ge=0)]  # EGP/hour
     currency: Literal["EGP"] = "EGP"
-    method: Literal["rule_based"] = "rule_based"
+    method: Literal["rule_based", "ml_prediction"] = "rule_based"
     rationale: str = Field(
         default=(
             "Rule-based calculation using project complexity, experience, "
