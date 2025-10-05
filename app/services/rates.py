@@ -9,10 +9,10 @@ minimum, competitive, and premium hourly rates in EGP based on:
  - Urgency (normal vs rush)
 """
 
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, List, cast, Literal
 from sqlalchemy.orm import Session
 
-from ..schemas.rates import RateRequest
+from ..schemas.rates import RateRequest, RateResponse
 from ..repositories.rate_repository import RateRepository
 
 
@@ -132,3 +132,37 @@ def calculate_compensation_tiers(
         rate_repo.create(calculation_data)
 
     return result
+
+
+def get_user_rate_history(db: Session, user_id: int) -> List[RateResponse]:
+    """Get rate calculation history for a user.
+
+    Args:
+        db: Database session
+        user_id: User ID to get history for
+
+    Returns:
+        List of RateResponse objects
+    """
+    rate_repo = RateRepository(db)
+    calculations = rate_repo.get_by_user_id(user_id)
+
+    # Convert RateCalculation objects to RateResponse objects
+    items = []
+    for calc in calculations:
+        items.append(
+            RateResponse(
+                minimum_rate=float(calc.minimum_rate),
+                competitive_rate=float(calc.competitive_rate),
+                premium_rate=float(calc.premium_rate),
+                currency="EGP",
+                method=cast("Literal['rule_based']", calc.calculation_method),
+                rationale=str(
+                    calc.reasoning
+                    or "Rule-based calculation using project complexity, experience, "
+                    "skills, client region, and urgency."
+                ),
+            )
+        )
+
+    return items

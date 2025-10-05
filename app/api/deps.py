@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 
 from ..db.database import get_db
 from ..core.security import decode_token
+from ..models.user import User
+from ..services.user_service import UserService
 
 security = HTTPBearer()
 
@@ -15,7 +17,7 @@ security = HTTPBearer()
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
-) -> Optional[dict]:
+) -> Optional[User]:
     """Get current authenticated user from JWT token.
 
     Args:
@@ -23,7 +25,7 @@ def get_current_user(
         db: Database session
 
     Returns:
-        User data from token payload
+        User object if token is valid
 
     Raises:
         HTTPException: If token is invalid or expired
@@ -38,38 +40,52 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # TODO: In a real implementation, you would:
-    # 1. Extract user_id from payload
-    # 2. Query database to get full user object
-    # 3. Return user object instead of payload
+    # Extract user_id from payload
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
-    return payload
+    # Query database to get full user object
+    user_service = UserService(db)
+    user = user_service.get_user_by_id(int(user_id))
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return user
 
 
 def get_current_active_user(
-    current_user: Optional[dict] = Depends(get_current_user),
-) -> dict:
+    current_user: Optional[User] = Depends(get_current_user),
+) -> User:
     """Get current active user (non-disabled).
 
     Args:
         current_user: Current user from get_current_user
 
     Returns:
-        Active user data
+        Active user object
 
     Raises:
-        HTTPException: If user is disabled
+        HTTPException: If user is disabled or not authenticated
     """
     if current_user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
         )
 
-    # TODO: Check if user is active/not disabled
-    # if not current_user.is_active:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_400_BAD_REQUEST,
-    #         detail="Inactive user"
-    #     )
+    # Check if user is active/not disabled
+    if not current_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user"
+        )
 
     return current_user
