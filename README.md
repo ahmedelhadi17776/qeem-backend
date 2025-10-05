@@ -287,24 +287,3 @@ OPENAI_API_KEY=sk-...
 ## 📄 License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
-
-## 🆘 Support
-
-- **Documentation**: [Database Operations Guide](../qeem-meta/docs/database-operations.md)
-- **Issues**: [GitHub Issues](https://github.com/your-org/qeem-backend/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-org/qeem-backend/discussions)
-
-## 🙏 Acknowledgments
-
-- **FastAPI** - Modern, fast web framework
-- **SQLAlchemy** - Python SQL toolkit
-- **Alembic** - Database migration tool
-- **Pydantic** - Data validation using Python type hints
-
----
-
-<div align="center">
-  <strong>Built with ❤️ for Egyptian Freelancers</strong>
-  <br>
-  <em>Know your value. Calculate your worth.</em>
-</div>
