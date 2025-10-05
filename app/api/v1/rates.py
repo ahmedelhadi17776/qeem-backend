@@ -1,29 +1,39 @@
-from typing import cast, Literal
+from typing import Annotated, cast, Literal
+
 from fastapi import APIRouter, Depends
-from ...services.rates import calculate_compensation_tiers
-from ...schemas.rates import RateRequest, RateResponse, RateHistoryResponse
-from ..deps import get_db
 from sqlalchemy.orm import Session
+
+from ...models.user import User
+from ...schemas.rates import RateRequest, RateResponse, RateHistoryResponse
+from ...services.rates import calculate_compensation_tiers, get_user_rate_history
+from ..deps import get_db, get_current_active_user
 
 router = APIRouter(prefix="/rates", tags=["rates"])
 
 
 @router.get("/history", response_model=RateHistoryResponse)
-async def get_history() -> RateHistoryResponse:
-    return RateHistoryResponse(items=[])
+async def get_history(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    db: Session = Depends(get_db),
+) -> RateHistoryResponse:
+    """Get rate calculation history for the current user."""
+    items = get_user_rate_history(db, int(current_user.id))
+    return RateHistoryResponse(items=items)
 
 
 @router.post("/calculate", response_model=RateResponse)
 async def calculate_rate(
-    payload: RateRequest, db: Session = Depends(get_db)
+    payload: RateRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    db: Session = Depends(get_db),
 ) -> RateResponse:
     """Calculate rate tiers based on a simple rule-based engine.
 
     This endpoint returns minimum, competitive, and premium rates in EGP.
+    Requires authentication to save calculation history.
     """
-    # TODO: Get user_id from authentication when auth is implemented
-    user_id = None  # Will be replaced with actual user authentication
-    tiers = calculate_compensation_tiers(payload, db=db, user_id=user_id)
+    # Use authenticated user ID
+    tiers = calculate_compensation_tiers(payload, db=db, user_id=int(current_user.id))
     return RateResponse(
         minimum_rate=float(tiers["minimum_rate"]),
         competitive_rate=float(tiers["competitive_rate"]),

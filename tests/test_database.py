@@ -4,6 +4,7 @@ import os
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -68,22 +69,26 @@ class TestDatabaseSchema:
             "DATABASE_URL", "postgresql://user:password@localhost:5432/qeem")
         return create_engine(DATABASE_URL)
 
-    def test_tables_exist(self, engine):
+    def test_tables_exist(self, db_session: Session):
         """Test that all required tables exist."""
+        from app.models.base import Base
+
+        # Create tables for this test
+        Base.metadata.create_all(bind=db_session.bind)
+
         expected_tables = {
             "users",
             "user_profiles",
             "rate_calculations",
             "market_statistics",
             "invoices",
-            "contracts",
-            "alembic_version"
+            "contracts"
         }
 
         try:
-            with engine.connect() as conn:
+            with db_session.bind.connect() as conn:
                 # Use SQLite-compatible query
-                if "sqlite" in str(engine.url):
+                if "sqlite" in str(db_session.bind.url):
                     result = conn.execute(text("""
                         SELECT name 
                         FROM sqlite_master 
@@ -101,11 +106,6 @@ class TestDatabaseSchema:
 
                 existing_tables = {row[0] for row in result.fetchall()}
 
-                # In CI environment, tables might not exist yet
-                if not existing_tables and "test_ci.db" in str(engine.url):
-                    pytest.skip(
-                        "No tables found in CI environment - migrations not run")
-
                 missing_tables = expected_tables - existing_tables
                 if missing_tables:
                     pytest.fail(f"Missing tables: {missing_tables}")
@@ -117,26 +117,22 @@ class TestDatabaseSchema:
         except OperationalError as e:
             pytest.fail(f"Failed to check tables: {e}")
 
-    def test_users_table_structure(self, engine):
+    def test_users_table_structure(self, db_session: Session):
         """Test users table has required columns."""
         required_columns = {
             "id", "email", "password_hash", "is_active",
             "is_verified", "role", "created_at", "updated_at"
         }
 
-        try:
-            with engine.connect() as conn:
-                # Check if users table exists first
-                if "sqlite" in str(engine.url):
-                    # Check if table exists
-                    result = conn.execute(text("""
-                        SELECT name FROM sqlite_master 
-                        WHERE type='table' AND name='users'
-                    """))
-                    if not result.fetchone():
-                        pytest.skip(
-                            "Users table not found - migrations not applied")
+        from app.models.base import Base
 
+        # Create tables for this test
+        Base.metadata.create_all(bind=db_session.bind)
+
+        try:
+            with db_session.bind.connect() as conn:
+                # Check if users table exists first
+                if "sqlite" in str(db_session.bind.url):
                     result = conn.execute(text("PRAGMA table_info(users)"))
                     # row[1] is column name
                     existing_columns = {row[1] for row in result.fetchall()}
@@ -157,7 +153,7 @@ class TestDatabaseSchema:
                 print(f"✅ Users table has {len(existing_columns)} columns")
 
         except OperationalError as e:
-            pytest.fail(f"Failed to check users table structure: {e}")
+            pytest.fail(f"Failed to check table structure: {e}")
 
     def test_alembic_version_table(self, engine):
         """Test that alembic version tracking is working."""

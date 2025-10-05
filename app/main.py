@@ -10,6 +10,7 @@ from starlette.responses import Response
 from .api.v1 import api_router
 from .api.v1 import auth as auth_router
 from .api.v1 import rates as rates_router
+from .api.v1 import users as users_router
 from .core.config import get_settings
 from .db.database import create_tables
 import os
@@ -61,6 +62,10 @@ async def health() -> HealthResponse:
 # Mount API v1 routers (include sub-routers before mounting to the app)
 api_router.include_router(rates_router.router)
 api_router.include_router(auth_router.router)
+
+# Import users router
+api_router.include_router(users_router.router)
+
 app.include_router(api_router)
 
 # CORS

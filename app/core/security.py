@@ -30,11 +30,12 @@ def create_access_token(
     expires_delta: Optional[timedelta] = None,
     extra_claims: Optional[Dict[str, Any]] = None,
 ) -> str:
-    expire = datetime.now(tz=timezone.utc) + (
-        expires_delta
-        if expires_delta is not None
-        else timedelta(days=settings.security.jwt_expires_in_days)
-    )
+    if expires_delta is not None:
+        expire = datetime.now(tz=timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(tz=timezone.utc) + timedelta(
+            days=settings.security.jwt_expires_in_days
+        )
     to_encode: Dict[str, Any] = {"sub": subject, "exp": expire}
     if extra_claims:
         to_encode.update(extra_claims)
