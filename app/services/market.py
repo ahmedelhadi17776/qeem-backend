@@ -26,8 +26,29 @@ logger = logging.getLogger(__name__)
 
 def _stable_key(prefix: str, payload: Dict) -> str:
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    digest = hashlib.sha1(encoded).hexdigest()
+    # Non-security hashing for cache key; use SHA-256 to satisfy security scanners
+    digest = hashlib.sha256(encoded).hexdigest()
     return f"{prefix}:{digest}"
+
+
+def _redis_get_safe(key: str) -> Optional[str]:
+    try:
+        r = get_redis()
+        value = r.get(key)
+        return cast(Optional[str], value)
+    except Exception as exc:  # pragma: no cover - network/environmental
+        logger.warning("market_cache_get_failed", extra={"key": key, "err": str(exc)})
+        return None
+
+
+def _redis_setex_safe(key: str, ttl: int, payload: str) -> None:
+    try:
+        r = get_redis()
+        r.setex(key, ttl, payload)
+    except Exception as exc:  # pragma: no cover - network/environmental
+        logger.warning(
+            "market_cache_set_failed", extra={"key": key, "ttl": ttl, "err": str(exc)}
+        )
 
 
 def _serialize_item(row: MarketStatistics) -> MarketStatisticsItem:
@@ -59,10 +80,9 @@ def get_market_statistics(
         else 3600
     )
     key = _stable_key("market:stats", query.model_dump())
-    redis = get_redis()
-    cached = redis.get(key)
+    cached = _redis_get_safe(key)
     if cached:
-        data = json.loads(cast(str, cached))
+        data = json.loads(cached)
         logger.info("market_statistics_cache_hit", extra={"key": key})
         resp = MarketStatisticsResponse.model_validate(data)
         resp.cached = True
@@ -83,7 +103,7 @@ def get_market_statistics(
     response = MarketStatisticsResponse(
         items=items, total=total, limit=query.limit, offset=query.offset, cached=False
     )
-    redis.setex(key, cache_ttl, response.model_dump_json())
+    _redis_setex_safe(key, cache_ttl, response.model_dump_json())
     logger.info(
         "market_statistics_cache_store",
         extra={"key": key, "ttl": cache_ttl, "count": len(items)},
@@ -100,10 +120,9 @@ def get_market_trends(db: Session, query: MarketTrendsQuery) -> MarketTrendsResp
         else 3600
     )
     key = _stable_key("market:trends", query.model_dump())
-    redis = get_redis()
-    cached = redis.get(key)
+    cached = _redis_get_safe(key)
     if cached:
-        data = json.loads(cast(str, cached))
+        data = json.loads(cached)
         logger.info("market_trends_cache_hit", extra={"key": key})
         resp = MarketTrendsResponse.model_validate(data)
         resp.cached = True
@@ -133,7 +152,7 @@ def get_market_trends(db: Session, query: MarketTrendsQuery) -> MarketTrendsResp
         )
 
     response = MarketTrendsResponse(points=points, cached=False)
-    redis.setex(key, cache_ttl, response.model_dump_json())
+    _redis_setex_safe(key, cache_ttl, response.model_dump_json())
     logger.info(
         "market_trends_cache_store",
         extra={"key": key, "ttl": cache_ttl, "points": len(points)},
