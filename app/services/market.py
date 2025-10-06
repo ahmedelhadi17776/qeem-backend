@@ -5,7 +5,7 @@ import json
 from typing import Dict, List, Optional, cast
 from datetime import date as DateType
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..infra.redis import get_redis
 from ..models.market_statistics import MarketStatistics
@@ -34,6 +34,8 @@ def _stable_key(prefix: str, payload: Dict) -> str:
 def _redis_get_safe(key: str) -> Optional[str]:
     try:
         r = get_redis()
+        if r is None:
+            return None
         value = r.get(key)
         return cast(Optional[str], value)
     except Exception as exc:  # pragma: no cover - network/environmental
@@ -44,6 +46,8 @@ def _redis_get_safe(key: str) -> Optional[str]:
 def _redis_setex_safe(key: str, ttl: int, payload: str) -> None:
     try:
         r = get_redis()
+        if r is None:
+            return
         r.setex(key, ttl, payload)
     except Exception as exc:  # pragma: no cover - network/environmental
         logger.warning(
@@ -69,8 +73,8 @@ def _serialize_item(row: MarketStatistics) -> MarketStatisticsItem:
     )
 
 
-def get_market_statistics(
-    db: Session, query: MarketStatisticsQuery
+async def get_market_statistics(
+    db: AsyncSession, query: MarketStatisticsQuery
 ) -> MarketStatisticsResponse:
     """Return paginated statistics, using cache-aside."""
     settings = get_settings()
@@ -89,7 +93,7 @@ def get_market_statistics(
         return resp
 
     repo = MarketRepository(db)
-    rows, total = repo.list_statistics(
+    rows, total = await repo.list_statistics(
         project_type=query.project_type,
         location=query.location,
         period_type=query.period_type,
@@ -111,7 +115,9 @@ def get_market_statistics(
     return response
 
 
-def get_market_trends(db: Session, query: MarketTrendsQuery) -> MarketTrendsResponse:
+async def get_market_trends(
+    db: AsyncSession, query: MarketTrendsQuery
+) -> MarketTrendsResponse:
     """Return trend points for last N periods, using cache-aside."""
     settings = get_settings()
     cache_ttl = int(
@@ -129,7 +135,7 @@ def get_market_trends(db: Session, query: MarketTrendsQuery) -> MarketTrendsResp
         return resp
 
     repo = MarketRepository(db)
-    rows = repo.list_trends(
+    rows = await repo.list_trends(
         project_type=query.project_type,
         location=query.location,
         period_type=query.period_type,

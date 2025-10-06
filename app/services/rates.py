@@ -10,7 +10,7 @@ minimum, competitive, and premium hourly rates in EGP based on:
 """
 
 from typing import Dict, Optional, Union, List, cast, Literal
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..schemas.rates import RateRequest, RateResponse
 from ..repositories.rate_repository import RateRepository
@@ -36,6 +36,7 @@ def _base_rate_for_project_type(project_type: str) -> float:
 
 
 def _complexity_multiplier(complexity: str) -> float:
+    """Get complexity multiplier for rate calculation."""
     return {
         "simple": 0.9,
         "moderate": 1.0,
@@ -45,6 +46,7 @@ def _complexity_multiplier(complexity: str) -> float:
 
 
 def _experience_multiplier(years: int) -> float:
+    """Get experience multiplier for rate calculation."""
     if years < 1:
         return 0.8
     if years < 3:
@@ -57,6 +59,7 @@ def _experience_multiplier(years: int) -> float:
 
 
 def _skills_multiplier(skills_count: int) -> float:
+    """Get skills multiplier for rate calculation."""
     if skills_count <= 2:
         return 0.95
     if skills_count <= 5:
@@ -67,6 +70,7 @@ def _skills_multiplier(skills_count: int) -> float:
 
 
 def _client_region_multiplier(region: str) -> float:
+    """Get client region multiplier for rate calculation."""
     return {
         "egypt": 1.0,
         "mena": 1.1,
@@ -77,11 +81,14 @@ def _client_region_multiplier(region: str) -> float:
 
 
 def _urgency_multiplier(urgency: str) -> float:
+    """Get urgency multiplier for rate calculation."""
     return 1.15 if urgency == "rush" else 1.0
 
 
-def calculate_compensation_tiers(
-    payload: RateRequest, db: Optional[Session] = None, user_id: Optional[int] = None
+async def calculate_compensation_tiers(
+    payload: RateRequest,
+    db: Optional[AsyncSession] = None,
+    user_id: Optional[int] = None,
 ) -> Dict[str, Union[float, str]]:
     """Compute hourly rate tiers in EGP.
 
@@ -129,12 +136,12 @@ def calculate_compensation_tiers(
             "premium_rate": result["premium_rate"],
             "calculation_method": "rule_based",
         }
-        rate_repo.create(calculation_data)
+        await rate_repo.create(calculation_data)
 
     return result
 
 
-def get_user_rate_history(db: Session, user_id: int) -> List[RateResponse]:
+async def get_user_rate_history(db: AsyncSession, user_id: int) -> List[RateResponse]:
     """Get rate calculation history for a user.
 
     Args:
@@ -145,7 +152,7 @@ def get_user_rate_history(db: Session, user_id: int) -> List[RateResponse]:
         List of RateResponse objects
     """
     rate_repo = RateRepository(db)
-    calculations = rate_repo.get_by_user_id(user_id)
+    calculations = await rate_repo.get_by_user_id(user_id)
 
     # Convert RateCalculation objects to RateResponse objects
     items = []

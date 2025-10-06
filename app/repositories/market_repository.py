@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple, cast
 from datetime import date as DateType
 
 from sqlalchemy import Select, and_, desc, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.market_statistics import MarketStatistics
 
@@ -13,7 +13,7 @@ from ..models.market_statistics import MarketStatistics
 class MarketRepository:
     """Data access for market statistics."""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
     def _apply_filters(
@@ -26,6 +26,7 @@ class MarketRepository:
         date_from: Optional[date],
         date_to: Optional[date],
     ) -> Select:
+        """Apply filters to a query statement."""
         conditions = []
         if project_type:
             conditions.append(MarketStatistics.project_type == project_type)
@@ -41,7 +42,7 @@ class MarketRepository:
             stmt = stmt.where(and_(*conditions))
         return stmt
 
-    def list_statistics(
+    async def list_statistics(
         self,
         *,
         project_type: Optional[str],
@@ -74,13 +75,14 @@ class MarketRepository:
             ).subquery()
         )
 
-        items = list(
-            self.db.execute(base_stmt.offset(offset).limit(limit)).scalars().all()
-        )
-        total = int(self.db.execute(total_stmt).scalar() or 0)
+        items_result = await self.db.execute(base_stmt.offset(offset).limit(limit))
+        items = list(items_result.scalars().all())
+
+        total_result = await self.db.execute(total_stmt)
+        total = int(total_result.scalar() or 0)
         return items, total
 
-    def list_trends(
+    async def list_trends(
         self,
         *,
         project_type: Optional[str],
@@ -103,7 +105,8 @@ class MarketRepository:
             .limit(window)
         )
 
-        rows = list(self.db.execute(stmt).scalars().all())
+        result = await self.db.execute(stmt)
+        rows = list(result.scalars().all())
         # Help type checker understand attribute type
         rows.sort(key=lambda r: cast(DateType, r.date))
         return rows

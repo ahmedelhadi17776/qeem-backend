@@ -89,14 +89,13 @@ Qeem Backend is the powerful API engine behind Egypt's first AI-powered freelanc
    # Prepare Alembic (ensure versions folder exists)
    if not exist alembic\versions mkdir alembic\versions
 
-   # Fresh reset (optional; DANGEROUS: wipes DB)
-   # psql "%DATABASE_URL%" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-
    # Generate and apply initial schema from models (first-time setup)
    alembic stamp base
    alembic revision --autogenerate -m "initial schema from models"
    alembic upgrade head
    ```
+
+   **Note**: Tables are created via Alembic migrations only. No auto-creation on startup.
 
 4. **Environment Configuration**
 
@@ -362,14 +361,15 @@ bandit -r app/
 
 ### Production Checklist
 
-- [ ] Set strong JWT secrets
+- [ ] Set strong JWT secrets (required in non-dev environments)
 - [ ] Configure CORS properly
 - [ ] Enable HTTPS
 - [ ] Set up monitoring (Sentry)
-- [ ] Configure rate limiting
+- [ ] Configure rate limiting (optional - requires Redis)
 - [ ] Set up database backups
 - [ ] Enable connection pooling
 - [ ] Configure logging
+- [ ] Redis is optional - app works without it (caching/rate limiting disabled)
 
 ### Environment Variables
 

@@ -1,5 +1,6 @@
 """Main FastAPI application."""
 
+import uuid
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -8,12 +9,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from .api.v1 import api_router
-from .api.v1 import auth as auth_router
-from .api.v1 import rates as rates_router
-from .api.v1 import market as market_router
-from .api.v1 import users as users_router
 from .core.config import get_settings
-from .db.database import create_tables
 import os
 from .schemas.common import HealthResponse
 from .core.logging import (
@@ -40,7 +36,6 @@ async def lifespan(app: FastAPI):
     # configure logging (JSON; set LOG_LEVEL via env per environment)
     configure_logging(level=settings.log_level, fmt="json")
     configure_uvicorn_json_logging(settings.log_level)
-    create_tables()
     yield
     # shutdown
     return
@@ -60,15 +55,23 @@ async def health() -> HealthResponse:
     return HealthResponse()
 
 
-# Mount API v1 routers (include sub-routers before mounting to the app)
-api_router.include_router(rates_router.router)
-api_router.include_router(auth_router.router)
-api_router.include_router(market_router.router)
-
-# Import users router
-api_router.include_router(users_router.router)
-
+# Mount API v1 router
 app.include_router(api_router)
+
+# Request ID middleware for tracing
+
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    """Add request ID to all requests for tracing."""
+    request_id = str(uuid.uuid4())
+    request.state.request_id = request_id
+
+    # Add request ID to response headers
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
+
 
 # CORS
 app.add_middleware(
@@ -82,12 +85,22 @@ app.add_middleware(
 
 # Optional basic rate limiting middleware (MVP)
 if settings.enable_rate_limiting:
-    from .infra.redis import get_redis
+    from .infra.redis import get_redis, is_redis_available
+    import logging
+
+    logger = logging.getLogger(__name__)
 
     @app.middleware("http")
     # type: ignore[no-redef]
     async def rate_limit_middleware(request: Request, call_next):
+        if not is_redis_available():
+            logger.warning("Rate limiting disabled: Redis unavailable")
+            return await call_next(request)
+
         redis = get_redis()
+        if redis is None:
+            return await call_next(request)
+
         client_host = request.client.host if request.client else "unknown"
         key = f"ratelimit:{client_host}:{request.url.path}"
         current = redis.get(key)

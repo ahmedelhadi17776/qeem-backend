@@ -1,7 +1,7 @@
 from typing import Annotated, cast, Literal
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...models.user import User
 from ...schemas.rates import RateRequest, RateResponse, RateHistoryResponse
@@ -14,10 +14,10 @@ router = APIRouter(prefix="/rates", tags=["rates"])
 @router.get("/history", response_model=RateHistoryResponse)
 async def get_history(
     current_user: Annotated[User, Depends(get_current_active_user)],
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> RateHistoryResponse:
     """Get rate calculation history for the current user."""
-    items = get_user_rate_history(db, int(current_user.id))
+    items = await get_user_rate_history(db, int(current_user.id))
     return RateHistoryResponse(items=items)
 
 
@@ -25,7 +25,7 @@ async def get_history(
 async def calculate_rate(
     payload: RateRequest,
     current_user: Annotated[User, Depends(get_current_active_user)],
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> RateResponse:
     """Calculate rate tiers based on a simple rule-based engine.
 
@@ -33,7 +33,9 @@ async def calculate_rate(
     Requires authentication to save calculation history.
     """
     # Use authenticated user ID
-    tiers = calculate_compensation_tiers(payload, db=db, user_id=int(current_user.id))
+    tiers = await calculate_compensation_tiers(
+        payload, db=db, user_id=int(current_user.id)
+    )
     return RateResponse(
         minimum_rate=float(tiers["minimum_rate"]),
         competitive_rate=float(tiers["competitive_rate"]),

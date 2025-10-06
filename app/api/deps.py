@@ -4,7 +4,7 @@ from typing import Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.database import get_db
 from ..core.security import decode_token
@@ -14,15 +14,15 @@ from ..services.user_service import UserService
 security = HTTPBearer()
 
 
-def get_current_user(
+async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Optional[User]:
     """Get current authenticated user from JWT token.
 
     Args:
         credentials: Bearer token from Authorization header
-        db: Database session
+        db: Async database session
 
     Returns:
         User object if token is valid
@@ -51,7 +51,7 @@ def get_current_user(
 
     # Query database to get full user object
     user_service = UserService(db)
-    user = user_service.get_user_by_id(int(user_id))
+    user = await user_service.get_user_by_id(int(user_id))
 
     if not user:
         raise HTTPException(
@@ -63,7 +63,7 @@ def get_current_user(
     return user
 
 
-def get_current_active_user(
+async def get_current_active_user(
     current_user: Optional[User] = Depends(get_current_user),
 ) -> User:
     """Get current active user (non-disabled).
