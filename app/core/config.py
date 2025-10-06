@@ -45,6 +45,7 @@ class AppSettings(BaseSettings):
     enable_ml_predictions: bool = Field(default=False, alias="ENABLE_ML_PREDICTIONS")
     enable_ai_negotiation: bool = Field(default=False, alias="ENABLE_AI_NEGOTIATION")
     enable_rate_limiting: bool = Field(default=False, alias="RATE_LIMITING_ENABLED")
+    market_cache_ttl: int = Field(default=3600, alias="MARKET_CACHE_TTL")
 
     # Nested
     security: SecuritySettings = SecuritySettings()

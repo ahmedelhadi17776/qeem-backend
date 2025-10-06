@@ -86,7 +86,15 @@ Qeem Backend is the powerful API engine behind Egypt's first AI-powered freelanc
    GRANT ALL PRIVILEGES ON DATABASE qeem TO elhadi;
    \q
 
-   # Run migrations
+   # Prepare Alembic (ensure versions folder exists)
+   if not exist alembic\versions mkdir alembic\versions
+
+   # Fresh reset (optional; DANGEROUS: wipes DB)
+   # psql "%DATABASE_URL%" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+
+   # Generate and apply initial schema from models (first-time setup)
+   alembic stamp base
+   alembic revision --autogenerate -m "initial schema from models"
    alembic upgrade head
    ```
 
@@ -148,7 +156,7 @@ GET  /api/v1/auth/me
 GET  /api/v1/users/profile
 PUT  /api/v1/users/profile
 
-# 🚧 Market Data (Planned)
+# ✅ Market Data (Implemented - cached via Redis, TTL via MARKET_CACHE_TTL)
 GET  /api/v1/market/statistics
 GET  /api/v1/market/trends
 
@@ -156,6 +164,18 @@ GET  /api/v1/market/trends
 POST /api/v1/negotiations/analyze
 POST /api/v1/negotiations/suggest
 ```
+
+#### Market Data Examples
+
+```bash
+# Statistics (paginated)
+curl "http://localhost:8000/api/v1/market/statistics?project_type=web_development&location=Cairo&period_type=weekly&limit=10&offset=0"
+
+# Trends (last 12 weeks)
+curl "http://localhost:8000/api/v1/market/trends?project_type=web_development&location=Cairo&period_type=weekly&window=12"
+```
+
+Caching: responses are cached using Redis (cache-aside) for 1 hour by default.
 
 ## 🔐 Authentication
 
@@ -273,6 +293,9 @@ alembic upgrade head
 
 # Rollback migration
 alembic downgrade -1
+
+# Show current revision
+alembic current
 ```
 
 ## 🔧 Development
