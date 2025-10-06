@@ -1,6 +1,6 @@
 """Market statistics model for ML data."""
 
-from sqlalchemy import Column, String, Float, Integer, Date, JSON
+from sqlalchemy import Column, String, Float, Integer, Date, JSON, Index
 from sqlalchemy.dialects.postgresql import JSONB
 
 from .base import Base, IDMixin, TimestampMixin
@@ -42,3 +42,13 @@ class MarketStatistics(Base, IDMixin, TimestampMixin):
 
     # Raw Data Reference: JSON on SQLite, JSONB on Postgres
     raw_data_ids = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
+
+    __table_args__ = (
+        Index(
+            "ix_market_stats_pt_loc_period_date",
+            "project_type",
+            "location",
+            "period_type",
+            "date",
+        ),
+    )

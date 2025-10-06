@@ -1,0 +1,141 @@
+"""Market service with cache-aside using Redis."""
+
+import hashlib
+import json
+from typing import Dict, List, Optional, cast
+from datetime import date as DateType
+
+from sqlalchemy.orm import Session
+
+from ..infra.redis import get_redis
+from ..models.market_statistics import MarketStatistics
+from ..schemas.market import (
+    MarketStatisticsItem,
+    MarketStatisticsQuery,
+    MarketStatisticsResponse,
+    MarketTrendsPoint,
+    MarketTrendsQuery,
+    MarketTrendsResponse,
+)
+from ..repositories.market_repository import MarketRepository
+from ..core.config import get_settings
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def _stable_key(prefix: str, payload: Dict) -> str:
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    digest = hashlib.sha1(encoded).hexdigest()
+    return f"{prefix}:{digest}"
+
+
+def _serialize_item(row: MarketStatistics) -> MarketStatisticsItem:
+    return MarketStatisticsItem(
+        date=cast(DateType, row.date),
+        period_type=row.period_type,  # type: ignore[arg-type]
+        project_type=cast(str, row.project_type),
+        location=cast(str, row.location),
+        average_rate=float(row.average_rate),
+        median_rate=float(row.median_rate),
+        min_rate=float(row.min_rate),
+        max_rate=float(row.max_rate),
+        demand_score=float(row.demand_score) if row.demand_score is not None else None,
+        competition_score=(
+            float(row.competition_score) if row.competition_score is not None else None
+        ),
+        market_trend=cast(Optional[str], row.market_trend),
+    )
+
+
+def get_market_statistics(
+    db: Session, query: MarketStatisticsQuery
+) -> MarketStatisticsResponse:
+    """Return paginated statistics, using cache-aside."""
+    settings = get_settings()
+    cache_ttl = int(
+        getattr(settings, "market_cache_ttl", 3600)
+        if hasattr(settings, "market_cache_ttl")
+        else 3600
+    )
+    key = _stable_key("market:stats", query.model_dump())
+    redis = get_redis()
+    cached = redis.get(key)
+    if cached:
+        data = json.loads(cast(str, cached))
+        logger.info("market_statistics_cache_hit", extra={"key": key})
+        resp = MarketStatisticsResponse.model_validate(data)
+        resp.cached = True
+        return resp
+
+    repo = MarketRepository(db)
+    rows, total = repo.list_statistics(
+        project_type=query.project_type,
+        location=query.location,
+        period_type=query.period_type,
+        date_from=query.date_from,
+        date_to=query.date_to,
+        limit=query.limit,
+        offset=query.offset,
+    )
+
+    items = [_serialize_item(r) for r in rows]
+    response = MarketStatisticsResponse(
+        items=items, total=total, limit=query.limit, offset=query.offset, cached=False
+    )
+    redis.setex(key, cache_ttl, response.model_dump_json())
+    logger.info(
+        "market_statistics_cache_store",
+        extra={"key": key, "ttl": cache_ttl, "count": len(items)},
+    )
+    return response
+
+
+def get_market_trends(db: Session, query: MarketTrendsQuery) -> MarketTrendsResponse:
+    """Return trend points for last N periods, using cache-aside."""
+    settings = get_settings()
+    cache_ttl = int(
+        getattr(settings, "market_cache_ttl", 3600)
+        if hasattr(settings, "market_cache_ttl")
+        else 3600
+    )
+    key = _stable_key("market:trends", query.model_dump())
+    redis = get_redis()
+    cached = redis.get(key)
+    if cached:
+        data = json.loads(cast(str, cached))
+        logger.info("market_trends_cache_hit", extra={"key": key})
+        resp = MarketTrendsResponse.model_validate(data)
+        resp.cached = True
+        return resp
+
+    repo = MarketRepository(db)
+    rows = repo.list_trends(
+        project_type=query.project_type,
+        location=query.location,
+        period_type=query.period_type,
+        window=query.window,
+    )
+
+    points: List[MarketTrendsPoint] = []
+    for r in rows:
+        points.append(
+            MarketTrendsPoint(
+                period_start=cast(DateType, r.date),
+                period_end=None,
+                average_rate=float(r.average_rate),
+                median_rate=float(r.median_rate),
+                demand_score=(
+                    float(r.demand_score) if r.demand_score is not None else None
+                ),
+                market_trend=cast(Optional[str], r.market_trend),
+            )
+        )
+
+    response = MarketTrendsResponse(points=points, cached=False)
+    redis.setex(key, cache_ttl, response.model_dump_json())
+    logger.info(
+        "market_trends_cache_store",
+        extra={"key": key, "ttl": cache_ttl, "points": len(points)},
+    )
+    return response

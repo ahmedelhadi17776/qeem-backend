@@ -33,22 +33,46 @@ def engine(database_url):
 def db_session(engine):
     """Create database session for testing."""
     from app.models.base import Base
-    
+
     # Create all tables for this test session
     Base.metadata.create_all(bind=engine)
-    
+
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     session = SessionLocal()
-    
+
     try:
         yield session
     finally:
         # Clean up: delete all data and drop tables
         session.rollback()
         session.close()
-        
+
         # Drop all tables to ensure clean state
         Base.metadata.drop_all(bind=engine)
+
+
+# Use a fake Redis during tests to avoid external dependency failures
+class _FakeRedis:
+    def __init__(self):
+        self.store = {}
+        self.ttl = {}
+
+    def get(self, key: str):
+        return self.store.get(key)
+
+    def setex(self, key: str, ttl: int, value: str):
+        self.store[key] = value
+        self.ttl[key] = ttl
+
+
+@pytest.fixture(autouse=True)
+def _fake_redis(monkeypatch):
+    try:
+        from app.services import market as market_service
+        monkeypatch.setattr(market_service, "get_redis", lambda: _FakeRedis())
+    except Exception:
+        pass
+    yield
 
 
 @pytest.fixture(scope="function")
