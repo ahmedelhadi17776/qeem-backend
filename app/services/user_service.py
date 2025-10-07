@@ -4,10 +4,12 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..db.database import get_transaction_manager
 from ..core.security import hash_password, verify_password, create_access_token
 from ..models.user import User, UserProfile
 from ..repositories.user_repository import UserRepository
 from ..schemas.auth import UserRegisterRequest, UserProfileUpdateRequest
+from ..services.email_service import EmailService
 
 
 class UserService:
@@ -37,30 +39,36 @@ class UserService:
         # Hash password
         hashed_password = hash_password(user_data.password)
 
-        # Create user
-        user_create_data = {
-            "email": user_data.email,
-            "password_hash": hashed_password,
-            "is_active": True,
-            "is_verified": False,  # TODO: Add email verification
-        }
+        # Use transaction to ensure atomicity
+        async with get_transaction_manager(self.db) as tx:
+            # Create user
+            user_create_data = {
+                "email": user_data.email,
+                "password_hash": hashed_password,
+                "is_active": True,
+                "is_verified": False,  # TODO: Add email verification
+            }
 
-        user = await self.user_repo.create(user_create_data)
+            user = await self.user_repo.create(user_create_data)
 
-        # Create user profile
-        profile_data = {
-            "user_id": user.id,
-            "first_name": user_data.first_name,
-            "last_name": user_data.last_name,
-            "country": "Egypt",  # Default for Egyptian freelancers
-            "preferred_currency": "EGP",
-        }
+            # Create user profile
+            profile_data = {
+                "user_id": user.id,
+                "first_name": user_data.first_name,
+                "last_name": user_data.last_name,
+                "country": "Egypt",  # Default for Egyptian freelancers
+                "preferred_currency": "EGP",
+            }
 
-        await self.user_repo.create_profile(profile_data)
+            await self.user_repo.create_profile(profile_data)
 
-        # Ensure all user attributes are loaded before returning
-        await self.db.refresh(user)
-        return user
+            # Send verification email
+            email_service = EmailService(self.db)
+            await email_service.send_verification_email(user)
+
+            # Ensure all user attributes are loaded before returning
+            await self.db.refresh(user)
+            return user
 
     async def authenticate_user(self, email: str, password: str) -> Optional[User]:
         """Authenticate user with email and password.
@@ -142,21 +150,23 @@ class UserService:
         if not user:
             return None
 
-        # Get existing profile or create new one
-        profile = await self.user_repo.get_profile(user_id)
+        # Use transaction to ensure atomicity
+        async with get_transaction_manager(self.db) as tx:
+            # Get existing profile or create new one
+            profile = await self.user_repo.get_profile(user_id)
 
-        # Convert Pydantic model to dict, excluding None values
-        update_data = {
-            k: v for k, v in profile_data.model_dump().items() if v is not None
-        }
+            # Convert Pydantic model to dict, excluding None values
+            update_data = {
+                k: v for k, v in profile_data.model_dump().items() if v is not None
+            }
 
-        if profile:
-            # Update existing profile
-            return await self.user_repo.update_profile(profile, update_data)
-        else:
-            # Create new profile
-            update_data["user_id"] = user_id
-            return await self.user_repo.create_profile(update_data)
+            if profile:
+                # Update existing profile
+                return await self.user_repo.update_profile(profile, update_data)
+            else:
+                # Create new profile
+                update_data["user_id"] = user_id
+                return await self.user_repo.create_profile(update_data)
 
     def create_access_token_for_user(self, user: User) -> str:
         """Create JWT access token for user.

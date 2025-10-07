@@ -1,9 +1,11 @@
 """Database configuration and session management."""
 
-from typing import AsyncGenerator
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
+from sqlalchemy.exc import SQLAlchemyError
 
 from ..core.config import get_settings
 
@@ -48,6 +50,55 @@ engine = create_async_engine(DATABASE_URL, **engine_kwargs)
 AsyncSessionLocal = async_sessionmaker(
     autocommit=False, autoflush=False, bind=engine, class_=AsyncSession
 )
+
+
+class TransactionManager:
+    """Transaction manager for handling database transactions with automatic rollback."""
+    
+    def __init__(self, session: AsyncSession):
+        self.session = session
+        self._transaction = None
+        self._savepoint = None
+    
+    async def __aenter__(self):
+        """Start a transaction."""
+        self._transaction = await self.session.begin()
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Commit or rollback transaction based on exceptions."""
+        if exc_type is not None:
+            # Exception occurred, rollback
+            await self.session.rollback()
+            return False
+        
+        # No exception, commit
+        try:
+            await self.session.commit()
+        except SQLAlchemyError:
+            await self.session.rollback()
+            raise
+    
+    async def create_savepoint(self, name: str):
+        """Create a savepoint for nested transactions."""
+        if self._transaction is None:
+            raise RuntimeError("No active transaction")
+        self._savepoint = await self.session.begin_nested()
+        return self._savepoint
+    
+    async def rollback_to_savepoint(self):
+        """Rollback to the last savepoint."""
+        if self._savepoint is None:
+            raise RuntimeError("No savepoint to rollback to")
+        await self._savepoint.rollback()
+        self._savepoint = None
+
+
+@asynccontextmanager
+async def get_transaction_manager(session: AsyncSession):
+    """Get a transaction manager for the given session."""
+    async with TransactionManager(session) as tx_manager:
+        yield tx_manager
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

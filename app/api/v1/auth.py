@@ -10,8 +10,11 @@ from ...schemas.auth import (
     UserLoginRequest,
     TokenResponse,
     UserResponse,
+    EmailVerificationRequest,
+    ResendVerificationRequest,
 )
 from ...services.user_service import UserService
+from ...services.email_service import EmailService
 from ..deps import get_db, get_current_active_user
 
 # OAuth2 standard token type
@@ -47,6 +50,54 @@ async def register(
 
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post("/verify-email", status_code=status.HTTP_200_OK)
+async def verify_email(
+    payload: EmailVerificationRequest, db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Verify user email with token."""
+    email_service = EmailService(db)
+    user = await email_service.verify_email_token(payload.token)
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification token"
+        )
+    
+    return {"message": "Email verified successfully", "user_id": user.id}
+
+
+@router.post("/resend-verification", status_code=status.HTTP_200_OK)
+async def resend_verification_email(
+    payload: ResendVerificationRequest, db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Resend verification email to user."""
+    user_service = UserService(db)
+    email_service = EmailService(db)
+    
+    user = await user_service.get_user_by_email(payload.email)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    if user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email is already verified"
+        )
+    
+    success = await email_service.resend_verification_email(user)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send verification email"
+        )
+    
+    return {"message": "Verification email sent successfully"}
 
 
 @router.post("/login", response_model=TokenResponse)

@@ -39,6 +39,18 @@ class TokenResponse(BaseModel):
     expires_in: int = Field(..., description="Token expiration time in seconds")
 
 
+class EmailVerificationRequest(BaseModel):
+    """Email verification request schema."""
+    
+    token: str = Field(..., description="Email verification token")
+
+
+class ResendVerificationRequest(BaseModel):
+    """Resend verification email request schema."""
+    
+    email: EmailStr = Field(..., description="User email address")
+
+
 class UserResponse(BaseModel):
     """User response schema."""
 

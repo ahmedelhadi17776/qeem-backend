@@ -2,8 +2,9 @@
 
 from enum import Enum
 
-from sqlalchemy import Boolean, Column, ForeignKey, String, Text, Integer
+from sqlalchemy import Boolean, Column, ForeignKey, String, Text, Integer, DateTime
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 from .base import Base, IDMixin, TimestampMixin
 
@@ -25,6 +26,11 @@ class User(Base, IDMixin, TimestampMixin):
     is_active = Column(Boolean, default=True, nullable=False)
     is_verified = Column(Boolean, default=False, nullable=False)
     role = Column(String(50), default=UserRole.FREELANCER, nullable=False)
+    
+    # Email verification fields
+    email_verification_token = Column(String(255), nullable=True, index=True)
+    email_verification_sent_at = Column(DateTime(timezone=True), nullable=True)
+    email_verified_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     profile = relationship(

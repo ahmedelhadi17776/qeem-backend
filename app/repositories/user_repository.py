@@ -24,11 +24,17 @@ class UserRepository:
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_by_email_verification_token(self, token: str) -> Optional[User]:
+        """Get user by email verification token."""
+        stmt = select(User).where(User.email_verification_token == token)
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def create(self, user_data: dict) -> User:
         """Create a new user."""
         user = User(**user_data)
         self.db.add(user)
-        await self.db.commit()
+        await self.db.flush()  # Flush to get ID without committing
         await self.db.refresh(user)
         return user
 
@@ -36,14 +42,14 @@ class UserRepository:
         """Update user data."""
         for key, value in user_data.items():
             setattr(user, key, value)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(user)
         return user
 
     async def delete(self, user: User) -> None:
         """Delete user."""
         await self.db.delete(user)
-        await self.db.commit()
+        await self.db.flush()
 
     async def get_profile(self, user_id: int) -> Optional[UserProfile]:
         """Get user profile by user ID."""
@@ -55,8 +61,7 @@ class UserRepository:
         """Create a new user profile."""
         profile = UserProfile(**profile_data)
         self.db.add(profile)
-        await self.db.commit()
-        # Don't refresh to avoid lazy loading issues in tests
+        await self.db.flush()
         return profile
 
     async def update_profile(
@@ -65,8 +70,7 @@ class UserRepository:
         """Update user profile data."""
         for key, value in profile_data.items():
             setattr(profile, key, value)
-        await self.db.commit()
-        # Don't refresh to avoid lazy loading issues in tests
+        await self.db.flush()
         return profile
 
     async def list_active_users(self, skip: int = 0, limit: int = 100) -> List[User]:

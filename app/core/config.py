@@ -10,6 +10,17 @@ from pydantic import model_validator
 from secrets import token_urlsafe
 
 
+class EmailSettings(BaseModel):
+    smtp_host: Optional[str] = Field(default=None, alias="SMTP_HOST")
+    smtp_port: int = Field(default=587, alias="SMTP_PORT")
+    smtp_username: Optional[str] = Field(default=None, alias="SMTP_USERNAME")
+    smtp_password: Optional[str] = Field(default=None, alias="SMTP_PASSWORD")
+    smtp_from_email: str = Field(default="noreply@qeem.com", alias="SMTP_FROM_EMAIL")
+    smtp_use_tls: bool = Field(default=True, alias="SMTP_USE_TLS")
+    verification_token_ttl_hours: int = Field(default=24, alias="VERIFICATION_TOKEN_TTL_HOURS")
+    enable_email_verification: bool = Field(default=True, alias="ENABLE_EMAIL_VERIFICATION")
+
+
 class SecuritySettings(BaseModel):
     jwt_secret: Optional[str] = Field(default=None, alias="JWT_SECRET")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
@@ -51,6 +62,7 @@ class AppSettings(BaseSettings):
     # Nested
     security: SecuritySettings = SecuritySettings()
     sentry: SentrySettings = SentrySettings()
+    email: EmailSettings = EmailSettings()
 
     @model_validator(mode="after")
     def _validate_urls(self) -> "AppSettings":
