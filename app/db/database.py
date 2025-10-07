@@ -38,15 +38,26 @@ def _engine_pool_class(url: str):
 
 DATABASE_URL = _create_engine_url()
 
+# Base configuration that works for all databases
 engine_kwargs = {
     "connect_args": _engine_connect_args(DATABASE_URL),
     "echo": settings.database.echo,
-    "pool_size": settings.database.pool_size,
-    "max_overflow": settings.database.max_overflow,
-    "pool_timeout": settings.database.pool_timeout,
-    "pool_recycle": settings.database.pool_recycle,
-    "pool_pre_ping": settings.database.pool_pre_ping,
 }
+
+# Add pool configuration only for PostgreSQL
+# SQLite uses StaticPool and doesn't support these parameters
+if DATABASE_URL.startswith("postgresql"):
+    engine_kwargs.update(
+        {
+            "pool_size": settings.database.pool_size,
+            "max_overflow": settings.database.max_overflow,
+            "pool_timeout": settings.database.pool_timeout,
+            "pool_recycle": settings.database.pool_recycle,
+            "pool_pre_ping": settings.database.pool_pre_ping,
+        }
+    )
+
+# Set pool class for SQLite
 pool_class = _engine_pool_class(DATABASE_URL)
 if pool_class is not None:
     engine_kwargs["poolclass"] = pool_class
