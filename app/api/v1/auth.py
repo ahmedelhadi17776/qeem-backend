@@ -12,7 +12,10 @@ from ...schemas.auth import (
     UserResponse,
     EmailVerificationRequest,
     ResendVerificationRequest,
+    RefreshTokenRequest,
+    LogoutRequest,
 )
+from ...api.rate_limit_deps import auth_login_rate_limit, auth_register_rate_limit
 from ...services.user_service import UserService
 from ...services.email_service import EmailService
 from ..deps import get_db, get_current_active_user
@@ -28,7 +31,9 @@ settings = get_settings()
     "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
 )
 async def register(
-    payload: UserRegisterRequest, db: AsyncSession = Depends(get_db)
+    payload: UserRegisterRequest,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(auth_register_rate_limit),
 ) -> UserResponse:
     """Register a new user account.
 
@@ -59,13 +64,13 @@ async def verify_email(
     """Verify user email with token."""
     email_service = EmailService(db)
     user = await email_service.verify_email_token(payload.token)
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired verification token"
+            detail="Invalid or expired verification token",
         )
-    
+
     return {"message": "Email verified successfully", "user_id": user.id}
 
 
@@ -76,33 +81,33 @@ async def resend_verification_email(
     """Resend verification email to user."""
     user_service = UserService(db)
     email_service = EmailService(db)
-    
+
     user = await user_service.get_user_by_email(payload.email)
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
-    
+
     if user.is_verified:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email is already verified"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Email is already verified"
         )
-    
+
     success = await email_service.resend_verification_email(user)
     if not success:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to send verification email"
+            detail="Failed to send verification email",
         )
-    
+
     return {"message": "Verification email sent successfully"}
 
 
 @router.post("/login", response_model=TokenResponse)
 async def login(
-    payload: UserLoginRequest, db: AsyncSession = Depends(get_db)
+    payload: UserLoginRequest,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(auth_login_rate_limit),
 ) -> TokenResponse:
     """Authenticate user and return JWT token."""
     user_service = UserService(db)
@@ -115,8 +120,18 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Create access token
-    access_token = user_service.create_access_token_for_user(user)
+    # Create token pair
+    access_token, refresh_token, token_hash, token_family, expires_at = (
+        user_service.create_token_pair(user)
+    )
+
+    # Store refresh token
+    await user_service.token_repo.create_refresh_token(
+        user_id=user.id,
+        token_hash=token_hash,
+        expires_at=expires_at,
+        token_family=token_family,
+    )
 
     # Calculate expiration time
     expires_in = (
@@ -124,7 +139,10 @@ async def login(
     )  # Convert days to seconds
 
     return TokenResponse(
-        access_token=access_token, token_type=TOKEN_TYPE, expires_in=expires_in
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type=TOKEN_TYPE,
+        expires_in=expires_in,
     )
 
 
@@ -146,18 +164,55 @@ async def get_current_user_info(
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(
-    refresh_token: str, db: AsyncSession = Depends(get_db)
+    payload: RefreshTokenRequest, db: AsyncSession = Depends(get_db)
 ) -> TokenResponse:
-    """Refresh JWT token.
+    """Refresh JWT token using refresh token."""
+    user_service = UserService(db)
+    result = await user_service.refresh_access_token(payload.refresh_token)
 
-    Note: This is a simplified implementation. In production, you'd want to:
-    1. Implement refresh token rotation
-    2. Store refresh tokens in Redis/database
-    3. Add token blacklisting
-    """
-    # For now, just return a new token based on the current user
-    # In a real implementation, you'd validate the refresh token first
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Refresh token endpoint not yet implemented",
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    access_token, refresh_token = result
+
+    # Calculate expiration time
+    expires_in = (
+        settings.security.jwt_expires_in_days * 24 * 60 * 60
+    )  # Convert days to seconds
+
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type=TOKEN_TYPE,
+        expires_in=expires_in,
     )
+
+
+@router.post("/logout", status_code=status.HTTP_200_OK)
+async def logout(payload: LogoutRequest, db: AsyncSession = Depends(get_db)) -> dict:
+    """Logout user by revoking refresh token."""
+    user_service = UserService(db)
+    success = await user_service.logout_user(payload.refresh_token)
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid refresh token"
+        )
+
+    return {"message": "Logged out successfully"}
+
+
+@router.post("/logout-all", status_code=status.HTTP_200_OK)
+async def logout_all_devices(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Logout user from all devices by revoking all refresh tokens."""
+    user_service = UserService(db)
+    count = await user_service.revoke_all_tokens(int(current_user.id))
+
+    return {"message": f"Logged out from {count} devices"}

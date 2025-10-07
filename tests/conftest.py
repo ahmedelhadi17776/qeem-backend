@@ -16,6 +16,9 @@ if str(ROOT) not in sys.path:
 # Load environment variables
 load_dotenv()
 
+# Disable rate limiting for tests
+os.environ["RATE_LIMITING_ENABLED"] = "false"
+
 
 @pytest.fixture(scope="session")
 def database_url():

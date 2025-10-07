@@ -41,7 +41,17 @@ jobs:
       - name: Run tests
         env:
           DATABASE_URL: sqlite:///./test_ci.db
-        run: pytest --cov=app --cov-report=xml
+          REDIS_URL: redis://localhost:6379/0
+          JWT_SECRET_KEY: test-secret-key
+          SMTP_HOST: localhost
+          SMTP_PORT: 587
+          SMTP_USERNAME: test@example.com
+          SMTP_PASSWORD: test-password
+          SMTP_FROM_EMAIL: test@example.com
+          ENABLE_EMAIL_VERIFICATION: false
+          RATE_LIMITING_ENABLED: false
+        run: |
+          pytest --cov=app --cov-report=xml --cov-fail-under=80
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3

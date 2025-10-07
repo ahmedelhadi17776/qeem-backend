@@ -2,11 +2,10 @@
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional, Dict, Any
-import smtplib
 from smtplib import SMTP, SMTPAuthenticationError, SMTPException
 
 from ..core.config import get_settings
@@ -17,20 +16,22 @@ settings = get_settings()
 
 class EmailClient:
     """SMTP email client with connection pooling and retry logic."""
-    
+
     def __init__(self):
         self._connection: Optional[SMTP] = None
         self._last_used = None
         self._connection_timeout = 300  # 5 minutes
-    
+
     async def _get_connection(self) -> SMTP:
         """Get or create SMTP connection with pooling."""
         now = datetime.now()
-        
+
         # Reuse existing connection if it's still valid
-        if (self._connection and 
-            self._last_used and 
-            (now - self._last_used).seconds < self._connection_timeout):
+        if (
+            self._connection
+            and self._last_used
+            and (now - self._last_used).seconds < self._connection_timeout
+        ):
             try:
                 # Test connection
                 self._connection.noop()
@@ -39,14 +40,14 @@ class EmailClient:
                 # Connection is dead, close it
                 try:
                     self._connection.quit()
-                except:
+                except Exception:
                     pass
-                self._connection = None
-        
+                    self._connection = None
+
         # Create new connection
         if not settings.email.smtp_host:
             raise ValueError("SMTP host not configured")
-        
+
         try:
             # Run SMTP connection in thread pool to avoid blocking
             loop = asyncio.get_event_loop()
@@ -58,89 +59,93 @@ class EmailClient:
         except Exception as e:
             logger.error(f"Failed to create SMTP connection: {e}")
             raise
-    
+
     def _create_smtp_connection(self) -> SMTP:
         """Create SMTP connection (runs in thread pool)."""
-        smtp = SMTP(settings.email.smtp_host, settings.email.smtp_port)
-        
+        smtp_host = settings.email.smtp_host
+        if smtp_host is None:
+            raise ValueError("SMTP host is not configured")
+
+        smtp = SMTP(smtp_host, settings.email.smtp_port)
+
         if settings.email.smtp_use_tls:
             smtp.starttls()
-        
+
         if settings.email.smtp_username and settings.email.smtp_password:
             smtp.login(settings.email.smtp_username, settings.email.smtp_password)
-        
+
         return smtp
-    
+
     async def send_email(
         self,
         to_email: str,
         subject: str,
         html_content: str,
         text_content: Optional[str] = None,
-        from_email: Optional[str] = None
+        from_email: Optional[str] = None,
     ) -> bool:
         """Send email with retry logic.
-        
+
         Args:
             to_email: Recipient email address
             subject: Email subject
             html_content: HTML email content
             text_content: Plain text content (optional)
             from_email: Sender email (uses default if not provided)
-            
+
         Returns:
             True if email sent successfully, False otherwise
         """
         if not settings.email.enable_email_verification:
             logger.info("Email verification disabled, skipping email send")
             return True
-        
+
         if not settings.email.smtp_host:
             logger.warning("SMTP not configured, skipping email send")
             return False
-        
+
         max_retries = 3
         for attempt in range(max_retries):
             try:
                 connection = await self._get_connection()
-                
+
                 # Create message
-                msg = MIMEMultipart('alternative')
-                msg['Subject'] = subject
-                msg['From'] = from_email or settings.email.smtp_from_email
-                msg['To'] = to_email
-                
+                msg = MIMEMultipart("alternative")
+                msg["Subject"] = subject
+                msg["From"] = from_email or settings.email.smtp_from_email
+                msg["To"] = to_email
+
                 # Add text content
                 if text_content:
-                    text_part = MIMEText(text_content, 'plain', 'utf-8')
+                    text_part = MIMEText(text_content, "plain", "utf-8")
                     msg.attach(text_part)
-                
+
                 # Add HTML content
-                html_part = MIMEText(html_content, 'html', 'utf-8')
+                html_part = MIMEText(html_content, "html", "utf-8")
                 msg.attach(html_part)
-                
+
                 # Send email
                 loop = asyncio.get_event_loop()
-                await loop.run_in_executor(
-                    None, connection.send_message, msg
-                )
-                
+                await loop.run_in_executor(None, connection.send_message, msg)
+
                 logger.info(f"Email sent successfully to {to_email}")
                 return True
-                
+
             except SMTPAuthenticationError as e:
                 logger.error(f"SMTP authentication failed: {e}")
                 return False
             except SMTPException as e:
                 logger.warning(f"SMTP error (attempt {attempt + 1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                    await asyncio.sleep(2**attempt)  # Exponential backoff
                     # Reset connection for retry
                     if self._connection:
                         try:
                             self._connection.quit()
-                        except:
-                            pass
+                        except Exception as e:
+                            logger.debug(
+                                f"Error closing SMTP connection during retry: {e}"
+                            )
                         self._connection = None
                 else:
                     logger.error(f"Failed to send email after {max_retries} attempts")
@@ -148,17 +153,17 @@ class EmailClient:
             except Exception as e:
                 logger.error(f"Unexpected error sending email: {e}")
                 return False
-        
+
         return False
-    
+
     async def close(self):
         """Close SMTP connection."""
         if self._connection:
             try:
                 loop = asyncio.get_event_loop()
                 await loop.run_in_executor(None, self._connection.quit)
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Error closing SMTP connection: {e}")
             finally:
                 self._connection = None
 
@@ -183,19 +188,21 @@ async def close_email_client():
         _email_client = None
 
 
-def render_email_template(template_name: str, context: Dict[str, Any]) -> tuple[str, str]:
+def render_email_template(
+    template_name: str, context: Dict[str, Any]
+) -> tuple[str, str]:
     """Render email template with context.
-    
+
     Args:
         template_name: Name of the template (without extension)
         context: Template context variables
-        
+
     Returns:
         Tuple of (html_content, text_content)
     """
     # Simple template rendering for MVP
     # In production, you'd use Jinja2 or similar
-    
+
     if template_name == "verification":
         html_content = f"""
         <!DOCTYPE html>
@@ -244,7 +251,7 @@ def render_email_template(template_name: str, context: Dict[str, Any]) -> tuple[
         </body>
         </html>
         """
-        
+
         text_content = f"""
         Welcome to Qeem!
         
@@ -260,9 +267,9 @@ def render_email_template(template_name: str, context: Dict[str, Any]) -> tuple[
         Best regards,
         The Qeem Team
         """
-        
+
         return html_content, text_content
-    
+
     # Default template
     html_content = f"<html><body><h1>{template_name}</h1><p>{context}</p></body></html>"
     text_content = f"{template_name}\n\n{context}"

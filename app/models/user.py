@@ -4,7 +4,6 @@ from enum import Enum
 
 from sqlalchemy import Boolean, Column, ForeignKey, String, Text, Integer, DateTime
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
 
 from .base import Base, IDMixin, TimestampMixin
 
@@ -14,6 +13,24 @@ class UserRole(str, Enum):
 
     FREELANCER = "freelancer"
     ADMIN = "admin"
+
+
+class RefreshToken(Base, IDMixin, TimestampMixin):
+    """Refresh token model for JWT token refresh."""
+
+    __tablename__ = "refresh_tokens"
+
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    token_hash = Column(String(255), nullable=False, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    revoked = Column(Boolean, default=False, nullable=False)
+    device_info = Column(String(500), nullable=True)  # User agent, IP, etc.
+    token_family = Column(String(255), nullable=True, index=True)  # For token rotation
+
+    # Relationships
+    user = relationship("User", back_populates="refresh_tokens")
 
 
 class User(Base, IDMixin, TimestampMixin):
@@ -26,7 +43,7 @@ class User(Base, IDMixin, TimestampMixin):
     is_active = Column(Boolean, default=True, nullable=False)
     is_verified = Column(Boolean, default=False, nullable=False)
     role = Column(String(50), default=UserRole.FREELANCER, nullable=False)
-    
+
     # Email verification fields
     email_verification_token = Column(String(255), nullable=True, index=True)
     email_verification_sent_at = Column(DateTime(timezone=True), nullable=True)
@@ -38,6 +55,9 @@ class User(Base, IDMixin, TimestampMixin):
         back_populates="user",
         uselist=False,
         cascade="all, delete-orphan",
+    )
+    refresh_tokens = relationship(
+        "RefreshToken", back_populates="user", cascade="all, delete-orphan"
     )
     rate_calculations = relationship(
         "RateCalculation", back_populates="user", cascade="all, delete-orphan"

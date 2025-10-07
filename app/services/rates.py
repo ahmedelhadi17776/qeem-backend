@@ -15,6 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db.database import get_transaction_manager
 from ..schemas.rates import RateRequest, RateResponse
 from ..repositories.rate_repository import RateRepository
+from ..infra.metrics import record_rate_calculation
+from ..services.audit_service import AuditService
 
 
 def _base_rate_for_project_type(project_type: str) -> float:
@@ -123,7 +125,9 @@ async def calculate_compensation_tiers(
 
     # Save calculation to database if session and user_id are provided
     if db and user_id:
-        async with get_transaction_manager(db) as tx:
+        # Check if we're already in a transaction
+        if db.in_transaction():
+            # Already in transaction, just create rate calculation directly
             rate_repo = RateRepository(db)
             calculation_data = {
                 "user_id": user_id,
@@ -139,6 +143,70 @@ async def calculate_compensation_tiers(
                 "calculation_method": "rule_based",
             }
             await rate_repo.create(calculation_data)
+
+            # Record metrics
+            record_rate_calculation(payload.project_type, payload.project_complexity)
+
+            # Log audit trail
+            audit_service = AuditService(db)
+            audit_service.log_action_async(
+                user_id=user_id,
+                action="rate_calculation",
+                resource_type="rate_calculation",
+                resource_id=str(calculation_data.get("id", "pending")),
+                new_values={
+                    "project_type": payload.project_type,
+                    "project_complexity": payload.project_complexity,
+                    "estimated_hours": payload.estimated_hours,
+                    "experience_years": payload.experience_years,
+                    "minimum_rate": result["minimum_rate"],
+                    "competitive_rate": result["competitive_rate"],
+                    "premium_rate": result["premium_rate"],
+                },
+                success=True,
+            )
+        else:
+            # Not in transaction, use transaction manager
+            async with get_transaction_manager(db):
+                rate_repo = RateRepository(db)
+                calculation_data = {
+                    "user_id": user_id,
+                    "project_type": payload.project_type,
+                    "project_complexity": payload.project_complexity,
+                    "estimated_hours": payload.estimated_hours,
+                    "experience_years": payload.experience_years,
+                    "skills_count": payload.skills_count,
+                    "location": payload.location,
+                    "minimum_rate": result["minimum_rate"],
+                    "competitive_rate": result["competitive_rate"],
+                    "premium_rate": result["premium_rate"],
+                    "calculation_method": "rule_based",
+                }
+                await rate_repo.create(calculation_data)
+
+                # Record metrics
+                record_rate_calculation(
+                    payload.project_type, payload.project_complexity
+                )
+
+                # Log audit trail
+                audit_service = AuditService(db)
+                audit_service.log_action_async(
+                    user_id=user_id,
+                    action="rate_calculation",
+                    resource_type="rate_calculation",
+                    resource_id=str(calculation_data.get("id", "pending")),
+                    new_values={
+                        "project_type": payload.project_type,
+                        "project_complexity": payload.project_complexity,
+                        "estimated_hours": payload.estimated_hours,
+                        "experience_years": payload.experience_years,
+                        "minimum_rate": result["minimum_rate"],
+                        "competitive_rate": result["competitive_rate"],
+                        "premium_rate": result["premium_rate"],
+                    },
+                    success=True,
+                )
 
     return result
 

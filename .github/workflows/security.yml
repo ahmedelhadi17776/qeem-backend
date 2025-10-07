@@ -33,6 +33,9 @@ jobs:
               run: |
                   safety check --json --output safety-report.json
                   safety check
+                  echo "Checking security of new production dependencies..."
+                  safety check --short-report prometheus-client prometheus-fastapi-instrumentator
+                  echo "Dependencies check completed"
               continue-on-error: true
 
             - name: Run Semgrep security scan

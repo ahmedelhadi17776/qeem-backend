@@ -1,7 +1,7 @@
 """Database configuration and session management."""
 
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
@@ -40,6 +40,12 @@ DATABASE_URL = _create_engine_url()
 
 engine_kwargs = {
     "connect_args": _engine_connect_args(DATABASE_URL),
+    "echo": settings.database.echo,
+    "pool_size": settings.database.pool_size,
+    "max_overflow": settings.database.max_overflow,
+    "pool_timeout": settings.database.pool_timeout,
+    "pool_recycle": settings.database.pool_recycle,
+    "pool_pre_ping": settings.database.pool_pre_ping,
 }
 pool_class = _engine_pool_class(DATABASE_URL)
 if pool_class is not None:
@@ -53,39 +59,42 @@ AsyncSessionLocal = async_sessionmaker(
 
 
 class TransactionManager:
-    """Transaction manager for handling database transactions with automatic rollback."""
-    
+    """Transaction manager for handling database transactions.
+
+    Provides automatic rollback functionality.
+    """
+
     def __init__(self, session: AsyncSession):
         self.session = session
         self._transaction = None
         self._savepoint = None
-    
+
     async def __aenter__(self):
         """Start a transaction."""
         self._transaction = await self.session.begin()
         return self
-    
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Commit or rollback transaction based on exceptions."""
         if exc_type is not None:
             # Exception occurred, rollback
             await self.session.rollback()
             return False
-        
+
         # No exception, commit
         try:
             await self.session.commit()
         except SQLAlchemyError:
             await self.session.rollback()
             raise
-    
+
     async def create_savepoint(self, name: str):
         """Create a savepoint for nested transactions."""
         if self._transaction is None:
             raise RuntimeError("No active transaction")
         self._savepoint = await self.session.begin_nested()
         return self._savepoint
-    
+
     async def rollback_to_savepoint(self):
         """Rollback to the last savepoint."""
         if self._savepoint is None:
@@ -106,5 +115,9 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         try:
             yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
         finally:
             await session.close()

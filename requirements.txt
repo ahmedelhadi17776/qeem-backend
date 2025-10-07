@@ -26,8 +26,8 @@ httpx==0.27.2                 # or latest stable
 celery==5.5.3                 # bump to latest 5.x
 sentry-sdk==2.35.1            # bump to latest 2.x
 bcrypt==4.1.2
-python-jose[cryptography]>=3.4.0  # Fixed security vulnerability
-cryptography>=42.0.0               # Replace ecdsa with maintained alternative
+PyJWT>=2.10.0                 # Secure JWT implementation (replaces python-jose)
+cryptography>=42.0.0          # Replace ecdsa with maintained alternative
 passlib[bcrypt]==1.7.4
 pymongo[srv]>=4.6.3           # Fixed security vulnerability
 email-validator==2.1.0        # Pydantic email validation
@@ -40,4 +40,5 @@ flake8==7.0.0                # Linting
 mypy==1.8.0                  # Type checking
 bandit>=1.7.7                # Fixed security vulnerability
 pbr>=5.11.0                  # Required by bandit
-safety==3.6.2                # Dependency vulnerability scanning (latest version with Pydantic v2 support)
+prometheus-client==0.20.0
+prometheus-fastapi-instrumentator==7.0.0
