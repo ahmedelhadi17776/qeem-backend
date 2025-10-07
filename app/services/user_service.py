@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.security import hash_password, verify_password, create_access_token
 from ..models.user import User, UserProfile
@@ -13,11 +13,11 @@ from ..schemas.auth import UserRegisterRequest, UserProfileUpdateRequest
 class UserService:
     """Service for user-related business logic."""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
         self.user_repo = UserRepository(db)
 
-    def create_user(self, user_data: UserRegisterRequest) -> User:
+    async def create_user(self, user_data: UserRegisterRequest) -> User:
         """Create a new user with profile.
 
         Args:
@@ -30,7 +30,7 @@ class UserService:
             ValueError: If email already exists
         """
         # Check if user already exists
-        existing_user = self.user_repo.get_by_email(user_data.email)
+        existing_user = await self.user_repo.get_by_email(user_data.email)
         if existing_user:
             raise ValueError("Email already registered")
 
@@ -45,7 +45,7 @@ class UserService:
             "is_verified": False,  # TODO: Add email verification
         }
 
-        user = self.user_repo.create(user_create_data)
+        user = await self.user_repo.create(user_create_data)
 
         # Create user profile
         profile_data = {
@@ -56,11 +56,13 @@ class UserService:
             "preferred_currency": "EGP",
         }
 
-        self.user_repo.create_profile(profile_data)
+        await self.user_repo.create_profile(profile_data)
 
+        # Ensure all user attributes are loaded before returning
+        await self.db.refresh(user)
         return user
 
-    def authenticate_user(self, email: str, password: str) -> Optional[User]:
+    async def authenticate_user(self, email: str, password: str) -> Optional[User]:
         """Authenticate user with email and password.
 
         Args:
@@ -70,7 +72,7 @@ class UserService:
         Returns:
             User object if authentication successful, None otherwise
         """
-        user = self.user_repo.get_by_email(email)
+        user = await self.user_repo.get_by_email(email)
         if not user:
             return None
 
@@ -82,7 +84,7 @@ class UserService:
 
         return user
 
-    def get_user_by_email(self, email: str) -> Optional[User]:
+    async def get_user_by_email(self, email: str) -> Optional[User]:
         """Get user by email.
 
         Args:
@@ -91,9 +93,9 @@ class UserService:
         Returns:
             User object if found, None otherwise
         """
-        return self.user_repo.get_by_email(email)
+        return await self.user_repo.get_by_email(email)
 
-    def get_user_by_id(self, user_id: int) -> Optional[User]:
+    async def get_user_by_id(self, user_id: int) -> Optional[User]:
         """Get user by ID.
 
         Args:
@@ -102,9 +104,11 @@ class UserService:
         Returns:
             User object if found, None otherwise
         """
-        return self.user_repo.get_by_id(user_id)
+        return await self.user_repo.get_by_id(user_id)
 
-    def get_user_with_profile(self, user_id: int) -> Optional[tuple[User, UserProfile]]:
+    async def get_user_with_profile(
+        self, user_id: int
+    ) -> Optional[tuple[User, UserProfile]]:
         """Get user with their profile.
 
         Args:
@@ -113,16 +117,16 @@ class UserService:
         Returns:
             Tuple of (User, UserProfile) if found, None otherwise
         """
-        user = self.user_repo.get_by_id(user_id)
+        user = await self.user_repo.get_by_id(user_id)
         if not user:
             return None
 
-        profile = self.user_repo.get_profile(user_id)
+        profile = await self.user_repo.get_profile(user_id)
         if profile is None:
             return None
         return user, profile
 
-    def update_user_profile(
+    async def update_user_profile(
         self, user_id: int, profile_data: UserProfileUpdateRequest
     ) -> Optional[UserProfile]:
         """Update user profile.
@@ -134,12 +138,12 @@ class UserService:
         Returns:
             Updated profile object if successful, None otherwise
         """
-        user = self.user_repo.get_by_id(user_id)
+        user = await self.user_repo.get_by_id(user_id)
         if not user:
             return None
 
         # Get existing profile or create new one
-        profile = self.user_repo.get_profile(user_id)
+        profile = await self.user_repo.get_profile(user_id)
 
         # Convert Pydantic model to dict, excluding None values
         update_data = {
@@ -148,11 +152,11 @@ class UserService:
 
         if profile:
             # Update existing profile
-            return self.user_repo.update_profile(profile, update_data)
+            return await self.user_repo.update_profile(profile, update_data)
         else:
             # Create new profile
             update_data["user_id"] = user_id
-            return self.user_repo.create_profile(update_data)
+            return await self.user_repo.create_profile(update_data)
 
     def create_access_token_for_user(self, user: User) -> str:
         """Create JWT access token for user.
@@ -167,7 +171,7 @@ class UserService:
             subject=str(user.id), extra_claims={"email": user.email}
         )
 
-    def is_email_available(self, email: str) -> bool:
+    async def is_email_available(self, email: str) -> bool:
         """Check if email is available for registration.
 
         Args:
@@ -176,5 +180,5 @@ class UserService:
         Returns:
             True if email is available, False otherwise
         """
-        user = self.user_repo.get_by_email(email)
+        user = await self.user_repo.get_by_email(email)
         return user is None

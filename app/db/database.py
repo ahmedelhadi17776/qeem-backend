@@ -1,28 +1,34 @@
 """Database configuration and session management."""
 
-from typing import Generator
+from typing import AsyncGenerator
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 from ..core.config import get_settings
-from ..models.base import Base
 
 settings = get_settings()
 
 
 def _create_engine_url() -> str:
-    return settings.database_url
+    """Convert sync database URL to async URL."""
+    url = settings.database_url
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    elif url.startswith("sqlite://"):
+        return url.replace("sqlite://", "sqlite+aiosqlite://", 1)
+    return url
 
 
 def _engine_connect_args(url: str) -> dict:
+    """Get connection arguments for async engine."""
     if url.startswith("sqlite"):
         return {"check_same_thread": False}
     return {}
 
 
 def _engine_pool_class(url: str):
+    """Get pool class for async engine."""
     if url.startswith("sqlite"):
         return StaticPool
     return None
@@ -37,21 +43,17 @@ pool_class = _engine_pool_class(DATABASE_URL)
 if pool_class is not None:
     engine_kwargs["poolclass"] = pool_class
 
-engine = create_engine(DATABASE_URL, **engine_kwargs)
+engine = create_async_engine(DATABASE_URL, **engine_kwargs)
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-def create_tables() -> None:
-    """Create all database tables. Use only in development."""
-    if settings.environment == "development":
-        Base.metadata.create_all(bind=engine)
+AsyncSessionLocal = async_sessionmaker(
+    autocommit=False, autoflush=False, bind=engine, class_=AsyncSession
+)
 
 
-def get_db() -> Generator[Session, None, None]:
-    """Yield a database session for request scope."""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """Yield an async database session for request scope."""
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()

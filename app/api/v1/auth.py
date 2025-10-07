@@ -1,7 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.config import get_settings
 from ...models.user import User
@@ -25,7 +25,7 @@ settings = get_settings()
     "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
 )
 async def register(
-    payload: UserRegisterRequest, db: Session = Depends(get_db)
+    payload: UserRegisterRequest, db: AsyncSession = Depends(get_db)
 ) -> UserResponse:
     """Register a new user account.
 
@@ -33,10 +33,17 @@ async def register(
     """
     try:
         user_service = UserService(db)
-        user = user_service.create_user(payload)
+        user = await user_service.create_user(payload)
 
-        # Return user without sensitive data
-        return UserResponse.model_validate(user)
+        # Convert user to dict before detaching from session
+        user_dict = {
+            "id": user.id,
+            "email": user.email,
+            "is_active": user.is_active,
+            "is_verified": user.is_verified,
+            "created_at": user.created_at,
+        }
+        return UserResponse.model_validate(user_dict)
 
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -44,11 +51,11 @@ async def register(
 
 @router.post("/login", response_model=TokenResponse)
 async def login(
-    payload: UserLoginRequest, db: Session = Depends(get_db)
+    payload: UserLoginRequest, db: AsyncSession = Depends(get_db)
 ) -> TokenResponse:
     """Authenticate user and return JWT token."""
     user_service = UserService(db)
-    user = user_service.authenticate_user(payload.email, payload.password)
+    user = await user_service.authenticate_user(payload.email, payload.password)
 
     if not user:
         raise HTTPException(
@@ -75,13 +82,20 @@ async def get_current_user_info(
     current_user: Annotated[User, Depends(get_current_active_user)]
 ) -> UserResponse:
     """Get current authenticated user information."""
-    # current_user is now a User object from the dependency
-    return UserResponse.model_validate(current_user)
+    # Convert user to dict (user is already detached by dependency)
+    user_dict = {
+        "id": current_user.id,
+        "email": current_user.email,
+        "is_active": current_user.is_active,
+        "is_verified": current_user.is_verified,
+        "created_at": current_user.created_at,
+    }
+    return UserResponse.model_validate(user_dict)
 
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(
-    refresh_token: str, db: Session = Depends(get_db)
+    refresh_token: str, db: AsyncSession = Depends(get_db)
 ) -> TokenResponse:
     """Refresh JWT token.
 

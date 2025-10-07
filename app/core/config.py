@@ -7,10 +7,11 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import model_validator
+from secrets import token_urlsafe
 
 
 class SecuritySettings(BaseModel):
-    jwt_secret: str = Field(default="dev-secret", alias="JWT_SECRET")
+    jwt_secret: Optional[str] = Field(default=None, alias="JWT_SECRET")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     jwt_expires_in_days: int = Field(default=7, alias="JWT_EXPIRES_IN_DAYS")
 
@@ -50,6 +51,39 @@ class AppSettings(BaseSettings):
     # Nested
     security: SecuritySettings = SecuritySettings()
     sentry: SentrySettings = SentrySettings()
+
+    @model_validator(mode="after")
+    def _validate_urls(self) -> "AppSettings":
+        """Validate database and Redis URL formats."""
+        if not self.database_url.startswith(("postgresql://", "sqlite://")):
+            raise ValueError(
+                "DATABASE_URL must start with 'postgresql://' or 'sqlite://'"
+            )
+        if not self.redis_url.startswith("redis://"):
+            raise ValueError("REDIS_URL must start with 'redis://'")
+        return self
+
+    @model_validator(mode="after")
+    def _ensure_jwt_secret(self) -> "AppSettings":
+        """Ensure JWT secret policy by environment.
+
+        - development: auto-generate a random secret if not provided
+        - non-development: require a strong secret (min length 32)
+        """
+        secret = self.security.jwt_secret
+        if self.environment == "development":
+            if not secret or len(secret) < 16:
+                # Generate an ephemeral secret for local dev if missing/weak
+                self.security.jwt_secret = token_urlsafe(32)
+            return self
+
+        # Non-development environments must provide a strong secret
+        if not secret or len(secret) < 32:
+            raise ValueError(
+                "JWT_SECRET must be set to a secure value (length >= 32) "
+                "in non-development environments"
+            )
+        return self
 
     @model_validator(mode="after")
     def _parse_cors_origins(self) -> "AppSettings":

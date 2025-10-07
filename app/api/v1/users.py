@@ -3,7 +3,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...models.user import User
 from ...schemas.auth import (
@@ -19,13 +19,13 @@ router = APIRouter(prefix="/users", tags=["users"])
 @router.get("/profile", response_model=UserProfileResponse)
 async def get_profile(
     current_user: Annotated[User, Depends(get_current_active_user)],
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> UserProfileResponse:
     """Get current user's profile information."""
     user_service = UserService(db)
 
     # Get user with profile
-    user_with_profile = user_service.get_user_with_profile(int(current_user.id))
+    user_with_profile = await user_service.get_user_with_profile(int(current_user.id))
 
     if not user_with_profile:
         raise HTTPException(
@@ -63,15 +63,16 @@ async def get_profile(
 async def update_profile(
     profile_data: UserProfileUpdateRequest,
     current_user: Annotated[User, Depends(get_current_active_user)],
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> UserProfileResponse:
     """Update current user's profile information."""
     user_service = UserService(db)
 
+    # Store user ID to avoid lazy loading issues
+    user_id = int(current_user.id)
+
     # Update profile
-    updated_profile = user_service.update_user_profile(
-        int(current_user.id), profile_data
-    )
+    updated_profile = await user_service.update_user_profile(user_id, profile_data)
 
     if not updated_profile:
         raise HTTPException(
@@ -79,7 +80,7 @@ async def update_profile(
         )
 
     # Get updated user with profile
-    user_with_profile = user_service.get_user_with_profile(int(current_user.id))
+    user_with_profile = await user_service.get_user_with_profile(user_id)
 
     if not user_with_profile:
         raise HTTPException(
