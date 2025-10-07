@@ -1,5 +1,6 @@
 """User service for authentication and profile management."""
 
+from datetime import datetime
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -79,7 +80,7 @@ class UserService:
 
             # Record audit log
             await self.audit_service.log_action(
-                user_id=user.id,
+                user_id=int(user.id),
                 action="user_registration",
                 resource_type="user",
                 resource_id=str(user.id),
@@ -117,7 +118,7 @@ class UserService:
 
                 # Record audit log
                 await self.audit_service.log_action(
-                    user_id=user.id,
+                    user_id=int(user.id),
                     action="user_registration",
                     resource_type="user",
                     resource_id=str(user.id),
@@ -158,7 +159,7 @@ class UserService:
 
         # Log audit trail
         self.audit_service.log_action_async(
-            user_id=user.id,
+            user_id=int(user.id),
             action="user_login",
             resource_type="user",
             resource_id=str(user.id),
@@ -290,7 +291,7 @@ class UserService:
 
     def create_token_pair(
         self, user: User, device_info: Optional[str] = None
-    ) -> tuple[str, str]:
+    ) -> tuple[str, str, str, str, datetime]:
         """Create access and refresh token pair.
 
         Args:
@@ -298,7 +299,7 @@ class UserService:
             device_info: Device information (user agent, IP, etc.)
 
         Returns:
-            Tuple of (access_token, refresh_token)
+            Tuple of (access_token, refresh_token, token_hash, token_family, expires_at)
         """
         # Create access token
         access_token = create_access_token(
@@ -337,13 +338,13 @@ class UserService:
             return None
 
         # Get user
-        user = await self.user_repo.get_by_id(stored_token.user_id)
+        user = await self.user_repo.get_by_id(int(stored_token.user_id))
         if not user or not user.is_active:
             return None
 
         # Revoke old token family (token rotation)
         if stored_token.token_family:
-            await self.token_repo.revoke_token_family(stored_token.token_family)
+            await self.token_repo.revoke_token_family(str(stored_token.token_family))
 
         # Create new token pair
         (
@@ -352,14 +353,18 @@ class UserService:
             new_token_hash,
             new_token_family,
             expires_at,
-        ) = self.create_token_pair(user, stored_token.device_info)
+        ) = self.create_token_pair(
+            user, str(stored_token.device_info) if stored_token.device_info else None
+        )
 
         # Store new refresh token
         await self.token_repo.create_refresh_token(
-            user_id=user.id,
+            user_id=int(user.id),
             token_hash=new_token_hash,
             expires_at=expires_at,
-            device_info=stored_token.device_info,
+            device_info=(
+                str(stored_token.device_info) if stored_token.device_info else None
+            ),
             token_family=new_token_family,
         )
 

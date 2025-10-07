@@ -71,7 +71,7 @@ async def verify_email(
             detail="Invalid or expired verification token",
         )
 
-    return {"message": "Email verified successfully", "user_id": user.id}
+    return {"message": "Email verified successfully", "user_id": int(user.id)}
 
 
 @router.post("/resend-verification", status_code=status.HTTP_200_OK)
@@ -127,7 +127,7 @@ async def login(
 
     # Store refresh token
     await user_service.token_repo.create_refresh_token(
-        user_id=user.id,
+        user_id=int(user.id),
         token_hash=token_hash,
         expires_at=expires_at,
         token_family=token_family,

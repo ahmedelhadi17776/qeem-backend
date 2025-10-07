@@ -126,11 +126,21 @@ class RedisRateLimiter:
             redis.zremrangebyscore(key, 0, window_start)
 
             # Count current requests
-            current_count = redis.zcard(key)
+            current_count_result = redis.zcard(key)
+            current_count = (
+                await current_count_result
+                if hasattr(current_count_result, "__await__")
+                else current_count_result
+            )
 
             if current_count >= self.max_requests:
                 # Get oldest request time for reset calculation
-                oldest_requests = redis.zrange(key, 0, 0, withscores=True)
+                oldest_requests_result = redis.zrange(key, 0, 0, withscores=True)
+                oldest_requests = (
+                    await oldest_requests_result
+                    if hasattr(oldest_requests_result, "__await__")
+                    else oldest_requests_result
+                )
                 reset_time = (
                     int(oldest_requests[0][1] + self.window_size)
                     if oldest_requests
@@ -149,7 +159,7 @@ class RedisRateLimiter:
 
             return True, {
                 "limit": self.max_requests,
-                "remaining": self.max_requests - current_count - 1,
+                "remaining": self.max_requests - int(current_count) - 1,
                 "reset_time": int(now + self.window_size),
             }
 

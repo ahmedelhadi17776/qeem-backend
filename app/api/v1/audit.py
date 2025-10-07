@@ -10,6 +10,7 @@ from ...models.user import User
 from ...schemas.audit import (
     AuditTrailResponse,
     AuditStatsResponse,
+    AuditLogResponse,
 )
 from ...services.audit_service import AuditService
 from ..deps import get_db, get_current_active_user
@@ -33,7 +34,7 @@ async def get_my_audit_trail(
     audit_service = AuditService(db)
 
     logs = await audit_service.get_user_audit_trail(
-        user_id=current_user.id,
+        user_id=int(current_user.id),
         skip=skip,
         limit=limit,
         action=action,
@@ -41,10 +42,13 @@ async def get_my_audit_trail(
         end_date=end_date,
     )
 
+    # Convert dict logs to AuditLogResponse objects
+    audit_logs = [AuditLogResponse(**log) for log in logs]
+
     return AuditTrailResponse(
-        items=logs,
+        items=audit_logs,
         # This is simplified - in production you'd get actual total
-        total=len(logs),
+        total=len(audit_logs),
         skip=skip,
         limit=limit,
     )
@@ -84,10 +88,13 @@ async def get_audit_logs(
         end_date=end_date,
     )
 
+    # Convert dict logs to AuditLogResponse objects
+    audit_logs = [AuditLogResponse(**log) for log in logs]
+
     return AuditTrailResponse(
-        items=logs,
+        items=audit_logs,
         # This is simplified - in production you'd get actual total
-        total=len(logs),
+        total=len(audit_logs),
         skip=skip,
         limit=limit,
     )
