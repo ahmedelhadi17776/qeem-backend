@@ -118,12 +118,13 @@ class AppSettings(BaseSettings):
         """Ensure JWT secret policy by environment.
 
         - development: auto-generate a random secret if not provided
+        - ci/test: be more lenient, auto-generate if needed
         - non-development: require a strong secret (min length 32)
         """
         secret = self.security.jwt_secret
-        if self.environment == "development":
+        if self.environment in ["development", "ci", "test"]:
             if not secret or len(secret) < 16:
-                # Generate an ephemeral secret for local dev if missing/weak
+                # Generate an ephemeral secret for local dev/CI if missing/weak
                 self.security.jwt_secret = token_urlsafe(32)
             return self
 

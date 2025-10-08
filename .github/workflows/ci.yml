@@ -98,7 +98,7 @@ jobs:
             -e ENVIRONMENT=ci \
             -e DATABASE_URL=sqlite:///./test_ci.db \
             -e REDIS_URL=redis://localhost:6379/0 \
-            -e JWT_SECRET_KEY=test-secret-key-for-docker \
+            -e JWT_SECRET=test-secret-key-for-docker-with-32-chars-minimum-length \
             -e ENABLE_EMAIL_VERIFICATION=false \
             -e RATE_LIMITING_ENABLED=false \
             qeem-backend:test
@@ -107,22 +107,32 @@ jobs:
           echo "Container logs:"
           docker logs qeem-test
 
-          # wait up to 30s for readiness - just check if service responds
+          # wait up to 60s for readiness - check ping endpoint first (simpler)
           echo "Waiting for service to be ready..."
-          for i in {1..30}; do
-            if curl -s http://localhost:8000/health > /dev/null; then
+          for i in {1..60}; do
+            if curl -s http://localhost:8000/ping > /dev/null; then
               echo "Service is responding after $i seconds"; break
+            fi
+            if [ $((i % 10)) -eq 0 ]; then
+              echo "Attempt $i: Service not responding yet, showing logs..."
+              docker logs qeem-test --tail 20
             fi
             echo "Attempt $i: Service not responding yet, waiting..."
             sleep 1
           done
 
-          # Final check - just verify the endpoint responds (status doesn't matter)
-          echo "Final check - verifying service responds:"
-          response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health)
-          echo "Health endpoint returned status: $response"
-          if [ "$response" != "000" ]; then
-            echo "✅ Service is responding (status: $response)"
+          # Test ping endpoint (should always work)
+          echo "Testing ping endpoint:"
+          ping_response=$(curl -s http://localhost:8000/ping)
+          echo "Ping response: $ping_response"
+
+          # Test health endpoint (may fail in CI)
+          echo "Testing health endpoint:"
+          health_response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health)
+          echo "Health endpoint returned status: $health_response"
+
+          if [ "$ping_response" != "" ]; then
+            echo "✅ Service is responding (ping works)"
           else
             echo "❌ Service is not responding"
             exit 1

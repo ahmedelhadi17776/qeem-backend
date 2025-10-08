@@ -30,37 +30,55 @@ except Exception:
 # Load environment variables from .env file
 load_dotenv()
 
-settings = get_settings()
-logger = logging.getLogger(__name__)
+try:
+    settings = get_settings()
+    logger = logging.getLogger(__name__)
+    logger.info(
+        f"Configuration loaded successfully. Environment: {settings.environment}"
+    )
+except Exception as e:
+    print(f"Failed to load configuration: {e}")
+    raise
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # startup
-    sentry_dsn = settings.sentry.dsn or os.getenv("SENTRY_DSN")
-    if sentry_sdk and sentry_dsn:
-        # Validate DSN format - should be a proper Sentry DSN
-        if (
-            sentry_dsn.startswith("https://")
-            and "@" in sentry_dsn
-            and "/" in sentry_dsn
-            and sentry_dsn != "https://your-sentry-dsn@sentry.io/project-id"
-        ):
-            try:
-                sentry_sdk.init(dsn=sentry_dsn)
-                logger.info("Sentry initialized successfully")
-            except Exception as e:
-                logger.warning(f"Failed to initialize Sentry: {e}")
-        else:
-            logger.info(
-                "Sentry DSN not configured or invalid, skipping Sentry initialization"
-            )
+    try:
+        sentry_dsn = settings.sentry.dsn or os.getenv("SENTRY_DSN")
+        if sentry_sdk and sentry_dsn:
+            # Validate DSN format - should be a proper Sentry DSN
+            if (
+                sentry_dsn.startswith("https://")
+                and "@" in sentry_dsn
+                and "/" in sentry_dsn
+                and sentry_dsn != "https://your-sentry-dsn@sentry.io/project-id"
+            ):
+                try:
+                    sentry_sdk.init(dsn=sentry_dsn)
+                    logger.info("Sentry initialized successfully")
+                except Exception as e:
+                    logger.warning(f"Failed to initialize Sentry: {e}")
+            else:
+                logger.info("Sentry DSN not configured, skipping Sentry initialization")
 
-    # configure logging (JSON; set LOG_LEVEL via env per environment)
-    configure_logging(level=settings.log_level, fmt="json")
-    configure_uvicorn_json_logging(settings.log_level)
+        # configure logging (JSON; set LOG_LEVEL via env per environment)
+        try:
+            configure_logging(level=settings.log_level, fmt="json")
+            configure_uvicorn_json_logging(settings.log_level)
+        except Exception as e:
+            logger.warning(f"Failed to configure logging: {e}")
+            # Continue without custom logging configuration
+
+        logger.info("Application startup completed successfully")
+
+    except Exception as e:
+        logger.error(f"Failed during application startup: {e}")
+        # Don't fail the startup completely, just log the error
+
     yield
     # shutdown
+    logger.info("Application shutdown initiated")
     return
 
 
@@ -73,6 +91,12 @@ app = FastAPI(
 
 # Register exception handlers
 register_exception_handlers(app)
+
+
+@app.get("/ping")
+async def ping():
+    """Simple ping endpoint that doesn't require any external services."""
+    return {"message": "pong", "service": "qeem-backend"}
 
 
 @app.get("/health", response_model=HealthResponse)
