@@ -2,7 +2,7 @@
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.main import app
 from app.schemas.auth import UserRegisterRequest, UserLoginRequest
@@ -10,13 +10,24 @@ from app.services.user_service import UserService
 from app.core.security import create_access_token
 
 
-client = TestClient(app)
+@pytest.fixture
+def client(db_session):
+    """Create test client with database session override."""
+    from app.db.database import get_db
+
+    async def override_get_db():
+        return db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    yield TestClient(app)
+    app.dependency_overrides.clear()
 
 
 class TestUserRegistration:
     """Test user registration functionality."""
 
-    def test_register_user_success(self, db_session: Session):
+    @pytest.mark.asyncio
+    async def test_register_user_success(self, client, db_session: AsyncSession):
         """Test successful user registration."""
         import uuid
         unique_email = f"test_{uuid.uuid4().hex[:8]}@example.com"
@@ -35,13 +46,14 @@ class TestUserRegistration:
 
         assert response.status_code == 201
         data = response.json()
-        assert data["email"] == user_data["email"]
-        assert data["is_active"] is True
-        assert data["is_verified"] is False
+        assert data.get("email") == user_data["email"]
+        assert data.get("is_active") is True
+        assert data.get("is_verified") is False
         assert "password" not in data
         assert "password_hash" not in data
 
-    def test_register_user_duplicate_email(self, db_session: Session):
+    @pytest.mark.asyncio
+    async def test_register_user_duplicate_email(self, client, db_session: AsyncSession):
         """Test registration with duplicate email."""
         import uuid
         unique_email = f"duplicate_test_{uuid.uuid4().hex[:8]}@example.com"
@@ -67,9 +79,16 @@ class TestUserRegistration:
 
         response2 = client.post("/api/v1/auth/register", json=user_data2)
         assert response2.status_code == 400
-        assert "Email already registered" in response2.json()["detail"]
+        response_data = response2.json()
+        # Check if it's the custom error format or simple detail format
+        if "error" in response_data:
+            assert "Email already registered" in response_data["error"]["message"]
+        else:
+            assert "Email already registered" in response_data.get(
+                "detail", "")
 
-    def test_register_user_invalid_email(self, db_session: Session):
+    @pytest.mark.asyncio
+    async def test_register_user_invalid_email(self, client, db_session: AsyncSession):
         """Test registration with invalid email."""
         user_data = {
             "email": "invalid-email",
@@ -82,7 +101,8 @@ class TestUserRegistration:
 
         assert response.status_code == 422  # Validation error
 
-    def test_register_user_short_password(self, db_session: Session):
+    @pytest.mark.asyncio
+    async def test_register_user_short_password(self, client, db_session: AsyncSession):
         """Test registration with short password."""
         import uuid
         unique_email = f"test_{uuid.uuid4().hex[:8]}@example.com"
@@ -97,7 +117,8 @@ class TestUserRegistration:
 
         assert response.status_code == 422  # Validation error
 
-    def test_register_user_missing_fields(self, db_session: Session):
+    @pytest.mark.asyncio
+    async def test_register_user_missing_fields(self, client, db_session: AsyncSession):
         """Test registration with missing required fields."""
         import uuid
         unique_email = f"test_{uuid.uuid4().hex[:8]}@example.com"
@@ -115,7 +136,8 @@ class TestUserRegistration:
 class TestUserLogin:
     """Test user login functionality."""
 
-    def test_login_success(self, db_session: Session):
+    @pytest.mark.asyncio
+    async def test_login_success(self, client, db_session: AsyncSession):
         """Test successful user login."""
         import uuid
         unique_email = f"login_test_{uuid.uuid4().hex[:8]}@example.com"
@@ -147,7 +169,8 @@ class TestUserLogin:
         assert "expires_in" in data
         assert data["expires_in"] > 0
 
-    def test_login_invalid_email(self, db_session: Session):
+    @pytest.mark.asyncio
+    async def test_login_invalid_email(self, client, db_session: AsyncSession):
         """Test login with non-existent email."""
         login_data = {
             "email": "nonexistent@example.com",
@@ -157,9 +180,16 @@ class TestUserLogin:
         response = client.post("/api/v1/auth/login", json=login_data)
 
         assert response.status_code == 401
-        assert "Incorrect email or password" in response.json()["detail"]
+        response_data = response.json()
+        # Check if it's the custom error format or simple detail format
+        if "error" in response_data:
+            assert "Invalid email or password" in response_data["error"]["message"]
+        else:
+            assert "Invalid email or password" in response_data.get(
+                "detail", "")
 
-    def test_login_invalid_password(self, db_session: Session):
+    @pytest.mark.asyncio
+    async def test_login_invalid_password(self, client, db_session: AsyncSession):
         """Test login with incorrect password."""
         import uuid
         unique_email = f"invalid_pass_test_{uuid.uuid4().hex[:8]}@example.com"
@@ -185,9 +215,16 @@ class TestUserLogin:
         response = client.post("/api/v1/auth/login", json=login_data)
 
         assert response.status_code == 401
-        assert "Incorrect email or password" in response.json()["detail"]
+        response_data = response.json()
+        # Check if it's the custom error format or simple detail format
+        if "error" in response_data:
+            assert "Invalid email or password" in response_data["error"]["message"]
+        else:
+            assert "Invalid email or password" in response_data.get(
+                "detail", "")
 
-    def test_login_inactive_user(self, db_session: Session):
+    @pytest.mark.asyncio
+    async def test_login_inactive_user(self, client, db_session: AsyncSession):
         """Test login with inactive user."""
         import uuid
         unique_email = f"inactive_{uuid.uuid4().hex[:8]}@example.com"
@@ -199,11 +236,11 @@ class TestUserLogin:
             first_name="Inactive",
             last_name="User"
         )
-        user = user_service.create_user(user_data)
+        user = await user_service.create_user(user_data)
 
         # Deactivate user
         user.is_active = False
-        db_session.commit()
+        await db_session.commit()
 
         login_data = {
             "email": unique_email,
@@ -213,13 +250,20 @@ class TestUserLogin:
         response = client.post("/api/v1/auth/login", json=login_data)
 
         assert response.status_code == 401
-        assert "Incorrect email or password" in response.json()["detail"]
+        response_data = response.json()
+        # Check if it's the custom error format or simple detail format
+        if "error" in response_data:
+            assert "Account is deactivated" in response_data["error"]["message"]
+        else:
+            assert "Account is deactivated" in response_data.get(
+                "detail", "")
 
 
 class TestProtectedEndpoints:
     """Test protected endpoint functionality."""
 
-    def test_get_current_user_success(self, db_session: Session):
+    @pytest.mark.asyncio
+    async def test_get_current_user_success(self, client, db_session: AsyncSession):
         """Test getting current user with valid token."""
         import uuid
         unique_email = f"protected_test_{uuid.uuid4().hex[:8]}@example.com"
@@ -254,13 +298,15 @@ class TestProtectedEndpoints:
         data = response.json()
         assert data["email"] == unique_email
 
-    def test_get_current_user_no_token(self, db_session: Session):
+    @pytest.mark.asyncio
+    async def test_get_current_user_no_token(self, client, db_session: AsyncSession):
         """Test accessing protected endpoint without token."""
         response = client.get("/api/v1/auth/me")
 
         assert response.status_code == 403  # No authorization header
 
-    def test_get_current_user_invalid_token(self, db_session: Session):
+    @pytest.mark.asyncio
+    async def test_get_current_user_invalid_token(self, client, db_session: AsyncSession):
         """Test accessing protected endpoint with invalid token."""
         headers = {"Authorization": "Bearer invalid-token"}
         response = client.get("/api/v1/auth/me", headers=headers)
@@ -268,7 +314,8 @@ class TestProtectedEndpoints:
         assert response.status_code == 401
         assert "Could not validate credentials" in response.json()["detail"]
 
-    def test_get_current_user_expired_token(self, db_session: Session):
+    @pytest.mark.asyncio
+    async def test_get_current_user_expired_token(self, client, db_session: AsyncSession):
         """Test accessing protected endpoint with expired token."""
         from datetime import timedelta
         # Create expired token
@@ -284,7 +331,8 @@ class TestProtectedEndpoints:
         assert response.status_code == 401
         assert "Could not validate credentials" in response.json()["detail"]
 
-    def test_rate_calculation_with_auth(self, db_session: Session):
+    @pytest.mark.asyncio
+    async def test_rate_calculation_with_auth(self, client, db_session: AsyncSession):
         """Test rate calculation with authentication."""
         import uuid
         unique_email = f"rate_test_{uuid.uuid4().hex[:8]}@example.com"
@@ -334,7 +382,8 @@ class TestProtectedEndpoints:
         assert "premium_rate" in data
         assert data["currency"] == "EGP"
 
-    def test_rate_calculation_without_auth(self, db_session: Session):
+    @pytest.mark.asyncio
+    async def test_rate_calculation_without_auth(self, client, db_session: AsyncSession):
         """Test rate calculation without authentication should fail."""
         rate_data = {
             "project_type": "web_development",
@@ -355,7 +404,8 @@ class TestProtectedEndpoints:
 class TestUserProfile:
     """Test user profile functionality."""
 
-    def test_get_profile_success(self, db_session: Session):
+    @pytest.mark.asyncio
+    async def test_get_profile_success(self, client, db_session: AsyncSession):
         """Test getting user profile with valid token."""
         import uuid
         unique_email = f"profile_test_{uuid.uuid4().hex[:8]}@example.com"
@@ -392,7 +442,8 @@ class TestUserProfile:
         assert data["first_name"] == "Test"
         assert data["last_name"] == "User"
 
-    def test_update_profile_success(self, db_session: Session):
+    @pytest.mark.asyncio
+    async def test_update_profile_success(self, client, db_session: AsyncSession):
         """Test updating user profile."""
         import uuid
         unique_email = f"update_test_{uuid.uuid4().hex[:8]}@example.com"
@@ -440,13 +491,15 @@ class TestUserProfile:
         assert data["city"] == profile_data["city"]
         assert data["hourly_rate_preference"] == profile_data["hourly_rate_preference"]
 
-    def test_get_profile_without_auth(self, db_session: Session):
+    @pytest.mark.asyncio
+    async def test_get_profile_without_auth(self, client, db_session: AsyncSession):
         """Test getting profile without authentication."""
         response = client.get("/api/v1/users/profile")
 
         assert response.status_code == 403  # No authorization header
 
-    def test_update_profile_without_auth(self, db_session: Session):
+    @pytest.mark.asyncio
+    async def test_update_profile_without_auth(self, client, db_session: AsyncSession):
         """Test updating profile without authentication."""
         profile_data = {
             "bio": "Test bio"
@@ -460,7 +513,8 @@ class TestUserProfile:
 class TestRateHistory:
     """Test rate calculation history functionality."""
 
-    def test_get_rate_history_success(self, db_session: Session):
+    @pytest.mark.asyncio
+    async def test_get_rate_history_success(self, client, db_session: AsyncSession):
         """Test getting rate calculation history."""
         import uuid
         unique_email = f"history_test_{uuid.uuid4().hex[:8]}@example.com"
@@ -496,7 +550,8 @@ class TestRateHistory:
         assert "items" in data
         assert isinstance(data["items"], list)
 
-    def test_get_rate_history_without_auth(self, db_session: Session):
+    @pytest.mark.asyncio
+    async def test_get_rate_history_without_auth(self, client, db_session: AsyncSession):
         """Test getting rate history without authentication."""
         response = client.get("/api/v1/rates/history")
 

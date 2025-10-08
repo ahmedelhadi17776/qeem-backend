@@ -10,10 +10,13 @@ minimum, competitive, and premium hourly rates in EGP based on:
 """
 
 from typing import Dict, Optional, Union, List, cast, Literal
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..db.database import get_transaction_manager
 from ..schemas.rates import RateRequest, RateResponse
 from ..repositories.rate_repository import RateRepository
+from ..infra.metrics import record_rate_calculation
+from ..services.audit_service import AuditService
 
 
 def _base_rate_for_project_type(project_type: str) -> float:
@@ -36,6 +39,7 @@ def _base_rate_for_project_type(project_type: str) -> float:
 
 
 def _complexity_multiplier(complexity: str) -> float:
+    """Get complexity multiplier for rate calculation."""
     return {
         "simple": 0.9,
         "moderate": 1.0,
@@ -45,6 +49,7 @@ def _complexity_multiplier(complexity: str) -> float:
 
 
 def _experience_multiplier(years: int) -> float:
+    """Get experience multiplier for rate calculation."""
     if years < 1:
         return 0.8
     if years < 3:
@@ -57,6 +62,7 @@ def _experience_multiplier(years: int) -> float:
 
 
 def _skills_multiplier(skills_count: int) -> float:
+    """Get skills multiplier for rate calculation."""
     if skills_count <= 2:
         return 0.95
     if skills_count <= 5:
@@ -67,6 +73,7 @@ def _skills_multiplier(skills_count: int) -> float:
 
 
 def _client_region_multiplier(region: str) -> float:
+    """Get client region multiplier for rate calculation."""
     return {
         "egypt": 1.0,
         "mena": 1.1,
@@ -77,11 +84,14 @@ def _client_region_multiplier(region: str) -> float:
 
 
 def _urgency_multiplier(urgency: str) -> float:
+    """Get urgency multiplier for rate calculation."""
     return 1.15 if urgency == "rush" else 1.0
 
 
-def calculate_compensation_tiers(
-    payload: RateRequest, db: Optional[Session] = None, user_id: Optional[int] = None
+async def calculate_compensation_tiers(
+    payload: RateRequest,
+    db: Optional[AsyncSession] = None,
+    user_id: Optional[int] = None,
 ) -> Dict[str, Union[float, str]]:
     """Compute hourly rate tiers in EGP.
 
@@ -115,26 +125,93 @@ def calculate_compensation_tiers(
 
     # Save calculation to database if session and user_id are provided
     if db and user_id:
-        rate_repo = RateRepository(db)
-        calculation_data = {
-            "user_id": user_id,
-            "project_type": payload.project_type,
-            "project_complexity": payload.project_complexity,
-            "estimated_hours": payload.estimated_hours,
-            "experience_years": payload.experience_years,
-            "skills_count": payload.skills_count,
-            "location": payload.location,
-            "minimum_rate": result["minimum_rate"],
-            "competitive_rate": result["competitive_rate"],
-            "premium_rate": result["premium_rate"],
-            "calculation_method": "rule_based",
-        }
-        rate_repo.create(calculation_data)
+        # Check if we're already in a transaction
+        if db.in_transaction():
+            # Already in transaction, just create rate calculation directly
+            rate_repo = RateRepository(db)
+            calculation_data = {
+                "user_id": user_id,
+                "project_type": payload.project_type,
+                "project_complexity": payload.project_complexity,
+                "estimated_hours": payload.estimated_hours,
+                "experience_years": payload.experience_years,
+                "skills_count": payload.skills_count,
+                "location": payload.location,
+                "minimum_rate": result["minimum_rate"],
+                "competitive_rate": result["competitive_rate"],
+                "premium_rate": result["premium_rate"],
+                "calculation_method": "rule_based",
+            }
+            await rate_repo.create(calculation_data)
+
+            # Record metrics
+            record_rate_calculation(payload.project_type, payload.project_complexity)
+
+            # Log audit trail
+            audit_service = AuditService(db)
+            audit_service.log_action_async(
+                user_id=user_id,
+                action="rate_calculation",
+                resource_type="rate_calculation",
+                resource_id=str(calculation_data.get("id", "pending")),
+                new_values={
+                    "project_type": payload.project_type,
+                    "project_complexity": payload.project_complexity,
+                    "estimated_hours": payload.estimated_hours,
+                    "experience_years": payload.experience_years,
+                    "minimum_rate": result["minimum_rate"],
+                    "competitive_rate": result["competitive_rate"],
+                    "premium_rate": result["premium_rate"],
+                },
+                success=True,
+            )
+        else:
+            # Not in transaction, use transaction manager
+            async with get_transaction_manager(db):
+                rate_repo = RateRepository(db)
+                calculation_data = {
+                    "user_id": user_id,
+                    "project_type": payload.project_type,
+                    "project_complexity": payload.project_complexity,
+                    "estimated_hours": payload.estimated_hours,
+                    "experience_years": payload.experience_years,
+                    "skills_count": payload.skills_count,
+                    "location": payload.location,
+                    "minimum_rate": result["minimum_rate"],
+                    "competitive_rate": result["competitive_rate"],
+                    "premium_rate": result["premium_rate"],
+                    "calculation_method": "rule_based",
+                }
+                await rate_repo.create(calculation_data)
+
+                # Record metrics
+                record_rate_calculation(
+                    payload.project_type, payload.project_complexity
+                )
+
+                # Log audit trail
+                audit_service = AuditService(db)
+                audit_service.log_action_async(
+                    user_id=user_id,
+                    action="rate_calculation",
+                    resource_type="rate_calculation",
+                    resource_id=str(calculation_data.get("id", "pending")),
+                    new_values={
+                        "project_type": payload.project_type,
+                        "project_complexity": payload.project_complexity,
+                        "estimated_hours": payload.estimated_hours,
+                        "experience_years": payload.experience_years,
+                        "minimum_rate": result["minimum_rate"],
+                        "competitive_rate": result["competitive_rate"],
+                        "premium_rate": result["premium_rate"],
+                    },
+                    success=True,
+                )
 
     return result
 
 
-def get_user_rate_history(db: Session, user_id: int) -> List[RateResponse]:
+async def get_user_rate_history(db: AsyncSession, user_id: int) -> List[RateResponse]:
     """Get rate calculation history for a user.
 
     Args:
@@ -145,7 +222,7 @@ def get_user_rate_history(db: Session, user_id: int) -> List[RateResponse]:
         List of RateResponse objects
     """
     rate_repo = RateRepository(db)
-    calculations = rate_repo.get_by_user_id(user_id)
+    calculations = await rate_repo.get_by_user_id(user_id)
 
     # Convert RateCalculation objects to RateResponse objects
     items = []

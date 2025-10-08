@@ -1,10 +1,10 @@
 """Alembic script template for migrations."""
 
-"""Initial database schema 2
+"""add_missing_email_verification_columns
 
-Revision ID: e7cf46abb299
-Revises: 1cd42f1c7145
-Create Date: 2025-10-02 12:54:31.795475
+Revision ID: 7052b044339c
+Revises: b0ca8163bf25
+Create Date: 2025-10-07 05:06:45.332679
 
 """
 from alembic import op
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'e7cf46abb299'
-down_revision = '1cd42f1c7145'
+revision = '7052b044339c'
+down_revision = 'b0ca8163bf25'
 branch_labels = None
 depends_on = None
 

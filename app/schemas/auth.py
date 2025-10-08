@@ -31,12 +31,37 @@ class UserLoginRequest(BaseModel):
     password: str = Field(..., description="User password")
 
 
+class RefreshTokenRequest(BaseModel):
+    """Refresh token request schema."""
+
+    refresh_token: str = Field(..., description="Refresh token")
+
+
+class LogoutRequest(BaseModel):
+    """Logout request schema."""
+
+    refresh_token: str = Field(..., description="Refresh token to revoke")
+
+
 class TokenResponse(BaseModel):
     """JWT token response schema."""
 
     access_token: str = Field(..., description="JWT access token")
+    refresh_token: str = Field(..., description="Refresh token")
     token_type: str = Field(default="bearer", description="Token type")
     expires_in: int = Field(..., description="Token expiration time in seconds")
+
+
+class EmailVerificationRequest(BaseModel):
+    """Email verification request schema."""
+
+    token: str = Field(..., description="Email verification token")
+
+
+class ResendVerificationRequest(BaseModel):
+    """Resend verification email request schema."""
+
+    email: EmailStr = Field(..., description="User email address")
 
 
 class UserResponse(BaseModel):

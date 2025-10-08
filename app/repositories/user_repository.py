@@ -1,7 +1,7 @@
 """User repository for data access operations."""
 
 from typing import List, Optional
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from ..models.user import User, UserProfile
@@ -10,66 +10,77 @@ from ..models.user import User, UserProfile
 class UserRepository:
     """Repository for user-related database operations."""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
-    def get_by_id(self, user_id: int) -> Optional[User]:
+    async def get_by_id(self, user_id: int) -> Optional[User]:
         """Get user by ID."""
-        return self.db.get(User, user_id)
+        result = await self.db.get(User, user_id)
+        return result
 
-    def get_by_email(self, email: str) -> Optional[User]:
+    async def get_by_email(self, email: str) -> Optional[User]:
         """Get user by email."""
         stmt = select(User).where(User.email == email)
-        return self.db.execute(stmt).scalar_one_or_none()
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
 
-    def create(self, user_data: dict) -> User:
+    async def get_by_email_verification_token(self, token: str) -> Optional[User]:
+        """Get user by email verification token."""
+        stmt = select(User).where(User.email_verification_token == token)
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def create(self, user_data: dict) -> User:
         """Create a new user."""
         user = User(**user_data)
         self.db.add(user)
-        self.db.commit()
-        self.db.refresh(user)
+        await self.db.flush()  # Flush to get ID without committing
+        await self.db.refresh(user)
         return user
 
-    def update(self, user: User, user_data: dict) -> User:
+    async def update(self, user: User, user_data: dict) -> User:
         """Update user data."""
         for key, value in user_data.items():
             setattr(user, key, value)
-        self.db.commit()
-        self.db.refresh(user)
+        await self.db.flush()
+        await self.db.refresh(user)
         return user
 
-    def delete(self, user: User) -> None:
+    async def delete(self, user: User) -> None:
         """Delete user."""
-        self.db.delete(user)
-        self.db.commit()
+        await self.db.delete(user)
+        await self.db.flush()
 
-    def get_profile(self, user_id: int) -> Optional[UserProfile]:
+    async def get_profile(self, user_id: int) -> Optional[UserProfile]:
         """Get user profile by user ID."""
         stmt = select(UserProfile).where(UserProfile.user_id == user_id)
-        return self.db.execute(stmt).scalar_one_or_none()
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
 
-    def create_profile(self, profile_data: dict) -> UserProfile:
+    async def create_profile(self, profile_data: dict) -> UserProfile:
         """Create a new user profile."""
         profile = UserProfile(**profile_data)
         self.db.add(profile)
-        self.db.commit()
-        self.db.refresh(profile)
+        await self.db.flush()
         return profile
 
-    def update_profile(self, profile: UserProfile, profile_data: dict) -> UserProfile:
+    async def update_profile(
+        self, profile: UserProfile, profile_data: dict
+    ) -> UserProfile:
         """Update user profile data."""
         for key, value in profile_data.items():
             setattr(profile, key, value)
-        self.db.commit()
-        self.db.refresh(profile)
+        await self.db.flush()
         return profile
 
-    def list_active_users(self, skip: int = 0, limit: int = 100) -> List[User]:
+    async def list_active_users(self, skip: int = 0, limit: int = 100) -> List[User]:
         """List active users with pagination."""
         stmt = select(User).where(User.is_active.is_(True)).offset(skip).limit(limit)
-        return list(self.db.execute(stmt).scalars().all())
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
 
-    def count_users(self) -> int:
+    async def count_users(self) -> int:
         """Count total number of users."""
         stmt = select(User)
-        return len(list(self.db.execute(stmt).scalars().all()))
+        result = await self.db.execute(stmt)
+        return len(list(result.scalars().all()))

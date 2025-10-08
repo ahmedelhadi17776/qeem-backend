@@ -1,10 +1,10 @@
 """Alembic script template for migrations."""
 
-"""Initial database schema
+"""initial schema from models
 
-Revision ID: 10f6ff5d5050
+Revision ID: d50861d943d4
 Revises: 
-Create Date: 2025-10-02 13:01:33.610999
+Create Date: 2025-10-06 21:19:22.055481
 
 """
 from alembic import op
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '10f6ff5d5050'
+revision = 'd50861d943d4'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -36,7 +36,7 @@ def upgrade() -> None:
     sa.Column('demand_score', sa.Float(), nullable=True),
     sa.Column('competition_score', sa.Float(), nullable=True),
     sa.Column('market_trend', sa.String(length=20), nullable=True),
-    sa.Column('raw_data_ids', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('raw_data_ids', sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=True),
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -46,6 +46,7 @@ def upgrade() -> None:
     op.create_index(op.f('ix_market_statistics_id'), 'market_statistics', ['id'], unique=False)
     op.create_index(op.f('ix_market_statistics_location'), 'market_statistics', ['location'], unique=False)
     op.create_index(op.f('ix_market_statistics_project_type'), 'market_statistics', ['project_type'], unique=False)
+    op.create_index('ix_market_stats_pt_loc_period_date', 'market_statistics', ['project_type', 'location', 'period_type', 'date'], unique=False)
     op.create_table('users',
     sa.Column('email', sa.String(length=255), nullable=False),
     sa.Column('password_hash', sa.String(length=255), nullable=False),
@@ -179,6 +180,7 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_users_id'), table_name='users')
     op.drop_index(op.f('ix_users_email'), table_name='users')
     op.drop_table('users')
+    op.drop_index('ix_market_stats_pt_loc_period_date', table_name='market_statistics')
     op.drop_index(op.f('ix_market_statistics_project_type'), table_name='market_statistics')
     op.drop_index(op.f('ix_market_statistics_location'), table_name='market_statistics')
     op.drop_index(op.f('ix_market_statistics_id'), table_name='market_statistics')
