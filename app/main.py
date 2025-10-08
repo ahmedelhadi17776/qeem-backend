@@ -31,6 +31,7 @@ except Exception:
 load_dotenv()
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -129,9 +130,8 @@ app.add_middleware(get_security_headers_middleware(settings.environment))
 # Mount API v1 router
 app.include_router(api_router)
 
+
 # Request ID middleware for tracing
-
-
 @app.middleware("http")
 async def request_id_middleware(request: Request, call_next):
     """Add request ID to all requests for tracing."""
@@ -140,7 +140,7 @@ async def request_id_middleware(request: Request, call_next):
 
     # Add request ID to response headers
     response = await call_next(request)
-    response.headers["X-Request-ID"] = request_id
+    response.headers.get("X-Request-ID", request_id)
     return response
 
 

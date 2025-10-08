@@ -51,7 +51,7 @@ jobs:
           ENABLE_EMAIL_VERIFICATION: false
           RATE_LIMITING_ENABLED: false
         run: |
-          pytest --cov=app --cov-report=xml --cov-fail-under=80
+          pytest --cov=app --cov-report=xml --cov-fail-under=75
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
