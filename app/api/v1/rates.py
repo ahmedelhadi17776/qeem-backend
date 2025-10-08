@@ -3,6 +3,7 @@ from typing import Annotated, cast, Literal
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...api.rate_limit_deps import rates_calculate_rate_limit
 from ...models.user import User
 from ...schemas.rates import RateRequest, RateResponse, RateHistoryResponse
 from ...services.rates import calculate_compensation_tiers, get_user_rate_history
@@ -26,6 +27,7 @@ async def calculate_rate(
     payload: RateRequest,
     current_user: Annotated[User, Depends(get_current_active_user)],
     db: AsyncSession = Depends(get_db),
+    _: None = Depends(rates_calculate_rate_limit),
 ) -> RateResponse:
     """Calculate rate tiers based on a simple rule-based engine.
 

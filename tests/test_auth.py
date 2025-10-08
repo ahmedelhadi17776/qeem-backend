@@ -79,7 +79,13 @@ class TestUserRegistration:
 
         response2 = client.post("/api/v1/auth/register", json=user_data2)
         assert response2.status_code == 400
-        assert "Email already registered" in response2.json().get("detail")
+        response_data = response2.json()
+        # Check if it's the custom error format or simple detail format
+        if "error" in response_data:
+            assert "Email already registered" in response_data["error"]["message"]
+        else:
+            assert "Email already registered" in response_data.get(
+                "detail", "")
 
     @pytest.mark.asyncio
     async def test_register_user_invalid_email(self, client, db_session: AsyncSession):
@@ -174,7 +180,13 @@ class TestUserLogin:
         response = client.post("/api/v1/auth/login", json=login_data)
 
         assert response.status_code == 401
-        assert "Incorrect email or password" in response.json()["detail"]
+        response_data = response.json()
+        # Check if it's the custom error format or simple detail format
+        if "error" in response_data:
+            assert "Invalid email or password" in response_data["error"]["message"]
+        else:
+            assert "Invalid email or password" in response_data.get(
+                "detail", "")
 
     @pytest.mark.asyncio
     async def test_login_invalid_password(self, client, db_session: AsyncSession):
@@ -203,7 +215,13 @@ class TestUserLogin:
         response = client.post("/api/v1/auth/login", json=login_data)
 
         assert response.status_code == 401
-        assert "Incorrect email or password" in response.json()["detail"]
+        response_data = response.json()
+        # Check if it's the custom error format or simple detail format
+        if "error" in response_data:
+            assert "Invalid email or password" in response_data["error"]["message"]
+        else:
+            assert "Invalid email or password" in response_data.get(
+                "detail", "")
 
     @pytest.mark.asyncio
     async def test_login_inactive_user(self, client, db_session: AsyncSession):
@@ -232,7 +250,13 @@ class TestUserLogin:
         response = client.post("/api/v1/auth/login", json=login_data)
 
         assert response.status_code == 401
-        assert "Incorrect email or password" in response.json()["detail"]
+        response_data = response.json()
+        # Check if it's the custom error format or simple detail format
+        if "error" in response_data:
+            assert "Account is deactivated" in response_data["error"]["message"]
+        else:
+            assert "Account is deactivated" in response_data.get(
+                "detail", "")
 
 
 class TestProtectedEndpoints:

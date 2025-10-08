@@ -36,7 +36,7 @@ class RateRepository:
         """Create a new rate calculation."""
         calculation = RateCalculation(**calculation_data)
         self.db.add(calculation)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(calculation)
         return calculation
 
@@ -46,14 +46,14 @@ class RateRepository:
         """Update rate calculation data."""
         for key, value in calculation_data.items():
             setattr(calculation, key, value)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(calculation)
         return calculation
 
     async def delete(self, calculation: RateCalculation) -> None:
         """Delete rate calculation."""
         await self.db.delete(calculation)
-        await self.db.commit()
+        await self.db.flush()
 
     async def get_favorites(self, user_id: int) -> List[RateCalculation]:
         """Get favorite rate calculations for a user."""
@@ -75,7 +75,7 @@ class RateRepository:
         calculation = await self.get_by_id(calculation_id)
         if calculation and calculation.user_id == user_id:
             calculation.is_favorite = is_favorite  # type: ignore[assignment]
-            await self.db.commit()
+            await self.db.flush()
             await self.db.refresh(calculation)
             return calculation
         return None
