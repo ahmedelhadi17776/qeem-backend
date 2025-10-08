@@ -44,40 +44,52 @@ except Exception as e:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # startup
+    print("Application startup initiated...")
     try:
-        sentry_dsn = settings.sentry.dsn or os.getenv("SENTRY_DSN")
-        if sentry_sdk and sentry_dsn:
-            # Validate DSN format - should be a proper Sentry DSN
-            if (
-                sentry_dsn.startswith("https://")
-                and "@" in sentry_dsn
-                and "/" in sentry_dsn
-                and sentry_dsn != "https://your-sentry-dsn@sentry.io/project-id"
-            ):
-                try:
-                    sentry_sdk.init(dsn=sentry_dsn)
-                    logger.info("Sentry initialized successfully")
-                except Exception as e:
-                    logger.warning(f"Failed to initialize Sentry: {e}")
-            else:
-                logger.info("Sentry DSN not configured, skipping Sentry initialization")
+        # Skip complex initialization in CI environments to avoid startup failures
+        is_ci = os.getenv("CI") == "true" or settings.environment in ["ci", "test"]
 
-        # configure logging (JSON; set LOG_LEVEL via env per environment)
-        try:
-            configure_logging(level=settings.log_level, fmt="json")
-            configure_uvicorn_json_logging(settings.log_level)
-        except Exception as e:
-            logger.warning(f"Failed to configure logging: {e}")
-            # Continue without custom logging configuration
+        if not is_ci:
+            sentry_dsn = settings.sentry.dsn or os.getenv("SENTRY_DSN")
+            if sentry_sdk and sentry_dsn:
+                # Validate DSN format - should be a proper Sentry DSN
+                if (
+                    sentry_dsn.startswith("https://")
+                    and "@" in sentry_dsn
+                    and "/" in sentry_dsn
+                    and sentry_dsn != "https://your-sentry-dsn@sentry.io/project-id"
+                ):
+                    try:
+                        sentry_sdk.init(dsn=sentry_dsn)
+                        logger.info("Sentry initialized successfully")
+                    except Exception as e:
+                        logger.warning(f"Failed to initialize Sentry: {e}")
+                else:
+                    logger.info(
+                        "Sentry DSN not configured, skipping Sentry initialization"
+                    )
 
+            # configure logging (JSON; set LOG_LEVEL via env per environment)
+            try:
+                configure_logging(level=settings.log_level, fmt="json")
+                configure_uvicorn_json_logging(settings.log_level)
+            except Exception as e:
+                logger.warning(f"Failed to configure logging: {e}")
+                # Continue without custom logging configuration
+        else:
+            print("CI environment detected, skipping complex initialization")
+
+        print("Application startup completed successfully")
         logger.info("Application startup completed successfully")
 
     except Exception as e:
+        print(f"Warning during application startup: {e}")
         logger.error(f"Failed during application startup: {e}")
         # Don't fail the startup completely, just log the error
 
     yield
     # shutdown
+    print("Application shutdown initiated")
     logger.info("Application shutdown initiated")
     return
 

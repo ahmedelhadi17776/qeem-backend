@@ -62,22 +62,4 @@ USER appuser
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl -fsS http://127.0.0.1:${UVICORN_PORT}/health || exit 1
 
-# Create a startup script with debugging
-RUN echo '#!/bin/sh\n\
-    echo "Starting Qeem Backend..."\n\
-    echo "Environment variables:"\n\
-    echo "  CI=$CI"\n\
-    echo "  ENVIRONMENT=$ENVIRONMENT"\n\
-    echo "  DATABASE_URL=$DATABASE_URL"\n\
-    echo "  REDIS_URL=$REDIS_URL"\n\
-    echo "  UVICORN_HOST=$UVICORN_HOST"\n\
-    echo "  UVICORN_PORT=$UVICORN_PORT"\n\
-    echo ""\n\
-    echo "Testing Python import..."\n\
-    python -c "import app.main; print(\"App import successful\")" || { echo "App import failed"; python -c "import traceback; traceback.print_exc()"; exit 1; }\n\
-    echo ""\n\
-    echo "Starting uvicorn server..."\n\
-    exec uvicorn app.main:app --host ${UVICORN_HOST} --port ${UVICORN_PORT} --workers ${UVICORN_WORKERS} --proxy-headers --log-level info' > /app/start.sh && \
-    chmod +x /app/start.sh
-
-CMD ["/app/start.sh"]
+CMD ["sh", "-c", "uvicorn app.main:app --host ${UVICORN_HOST} --port ${UVICORN_PORT} --workers ${UVICORN_WORKERS} --proxy-headers --log-level info"]
