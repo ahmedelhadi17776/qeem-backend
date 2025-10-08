@@ -11,8 +11,6 @@ from jwt.exceptions import InvalidTokenError
 
 from .config import get_settings
 
-settings = get_settings()
-
 
 def hash_password(plain_password: str) -> str:
     salt = bcrypt.gensalt()
@@ -33,6 +31,7 @@ def create_access_token(
     expires_delta: Optional[timedelta] = None,
     extra_claims: Optional[Dict[str, Any]] = None,
 ) -> str:
+    settings = get_settings()
     if expires_delta is not None:
         expire = datetime.now(tz=timezone.utc) + expires_delta
     else:
@@ -56,6 +55,7 @@ def create_access_token(
 
 def decode_token(token: str) -> Optional[Dict[str, Any]]:
     try:
+        settings = get_settings()
         jwt_secret = settings.security.jwt_secret
         if jwt_secret is None:
             return None
