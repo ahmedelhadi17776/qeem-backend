@@ -1,10 +1,20 @@
 """ML prediction service for rate calculations."""
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING
 from pathlib import Path
-import joblib
-import pandas as pd
+
+# Optional ML imports - only needed if ML model is actually used
+try:
+    import joblib
+    import pandas as pd
+
+    HAS_ML_LIBS = True
+except ImportError:
+    joblib = None  # type: ignore
+    if not TYPE_CHECKING:
+        pd = None  # type: ignore
+    HAS_ML_LIBS = False
 
 from ..schemas.rates import RateRequest
 
@@ -25,6 +35,14 @@ class MLPredictionService:
         self.feature_engineer: Optional[Any] = None
         self.loaded = False
 
+        if not HAS_ML_LIBS:
+            logger.warning(
+                "ML libraries (joblib, pandas) not installed. "
+                "ML predictions will not be available. "
+                "Install with: pip install -r requirements-ml.txt"
+            )
+            return
+
         # Try to load model on initialization
         try:
             self.load_model()
@@ -33,11 +51,14 @@ class MLPredictionService:
 
     def load_model(self):
         """Load trained model from disk."""
+        if not HAS_ML_LIBS:
+            raise RuntimeError("ML libraries not installed")
+
         if not self.model_path.exists():
             raise FileNotFoundError(f"Model not found at {self.model_path}")
 
         # Load model artifacts
-        model_dict = joblib.load(self.model_path)
+        model_dict = joblib.load(self.model_path)  # type: ignore
 
         # Extract components
         self.model = model_dict
@@ -63,9 +84,9 @@ class MLPredictionService:
         Returns:
             True if model is loaded and ready
         """
-        return self.loaded and self.model is not None
+        return HAS_ML_LIBS and self.loaded and self.model is not None
 
-    def prepare_features(self, request: RateRequest) -> pd.DataFrame:
+    def prepare_features(self, request: RateRequest) -> "pd.DataFrame":
         """Convert RateRequest to model features.
 
         Args:
@@ -102,7 +123,7 @@ class MLPredictionService:
 
         return features
 
-    def _manual_feature_engineering(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _manual_feature_engineering(self, df: "pd.DataFrame") -> "pd.DataFrame":
         """Manual feature engineering as fallback.
 
         Args:
@@ -209,7 +230,7 @@ class MLPredictionService:
             logger.error(f"Error during ML prediction: {e}")
             raise
 
-    def _predict_with_ensemble(self, features: pd.DataFrame) -> float:
+    def _predict_with_ensemble(self, features: "pd.DataFrame") -> float:
         """Make prediction using ensemble model.
 
         Args:
@@ -247,7 +268,7 @@ class MLPredictionService:
 
         return ensemble_pred
 
-    def _calculate_confidence(self, features: pd.DataFrame) -> float:
+    def _calculate_confidence(self, features: "pd.DataFrame") -> float:
         """Calculate confidence score for prediction.
 
         Args:

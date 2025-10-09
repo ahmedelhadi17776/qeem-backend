@@ -33,6 +33,8 @@ class RateRequest(BaseModel):
 
 
 class RateResponse(BaseModel):
+    model_config = {"protected_namespaces": ()}  # Allow model_version field
+
     minimum_rate: Annotated[float, Field(ge=0)]  # EGP/hour
     competitive_rate: Annotated[float, Field(ge=0)]  # EGP/hour
     premium_rate: Annotated[float, Field(ge=0)]  # EGP/hour

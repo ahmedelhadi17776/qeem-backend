@@ -227,6 +227,46 @@ While fixing CI/CD, we also:
 
 ---
 
+### 3. Optional ML Imports
+
+**Issue**: Tests and Docker failing with `ModuleNotFoundError: No module named 'joblib'`
+
+**Root Cause**: Even though ML libs were commented out in requirements.txt, `ml_prediction.py` imported them at module level
+
+**Fix**: Made ML imports optional with try/except
+
+```python
+# Optional ML imports - only needed if ML model is actually used
+try:
+    import joblib
+    import pandas as pd
+    HAS_ML_LIBS = True
+except ImportError:
+    joblib = None  # type: ignore
+    pd = None  # type: ignore
+    HAS_ML_LIBS = False
+```
+
+**Benefits**:
+
+- Tests run successfully without ML libraries
+- Docker containers start successfully
+- ML service gracefully reports unavailability
+- No breaking changes to API
+
+### 4. Pydantic Protected Namespace Warning
+
+**Issue**: `Field "model_version" in RateResponse has conflict with protected namespace "model_"`
+
+**Fix**: Added `model_config` to allow `model_` prefix
+
+```python
+class RateResponse(BaseModel):
+    model_config = {"protected_namespaces": ()}  # Allow model_version field
+```
+
+---
+
 **Status**: ✅ All CI/CD issues resolved  
 **Date**: October 9, 2025  
 **Build**: Passing ✓
