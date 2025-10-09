@@ -1,13 +1,13 @@
-from typing import Annotated, cast, Literal
+from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...api.rate_limit_deps import rates_calculate_rate_limit
 from ...models.user import User
 from ...schemas.rates import RateRequest, RateResponse, RateHistoryResponse
 from ...services.rates import calculate_compensation_tiers, get_user_rate_history
 from ..deps import get_db, get_current_active_user
+
 
 router = APIRouter(prefix="/rates", tags=["rates"])
 
@@ -23,29 +23,21 @@ async def get_history(
 
 
 @router.post("/calculate", response_model=RateResponse)
-async def calculate_rate(
-    payload: RateRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+async def calculate_rate_endpoint(
+    request: RateRequest,
     db: AsyncSession = Depends(get_db),
-    _: None = Depends(rates_calculate_rate_limit),
+    current_user: User = Depends(get_current_active_user),
 ) -> RateResponse:
-    """Calculate rate tiers based on a simple rule-based engine.
-
-    This endpoint returns minimum, competitive, and premium rates in EGP.
-    Requires authentication to save calculation history.
     """
-    # Use authenticated user ID
-    tiers = await calculate_compensation_tiers(
-        payload, db=db, user_id=int(current_user.id)
+    Calculate freelance rate tiers based on project details.
+    This endpoint uses A/B testing: a percentage of users will receive
+    ML-based predictions, while others receive rule-based calculations.
+    """
+    # A/B test: 10% of users get ML predictions (users with ID ending in 0)
+    user_id = int(current_user.id)
+    use_ml = (user_id % 10) == 0
+
+    result_dict = await calculate_compensation_tiers(
+        payload=request, db=db, user_id=user_id, use_ml=use_ml
     )
-    return RateResponse(
-        minimum_rate=float(tiers["minimum_rate"]),
-        competitive_rate=float(tiers["competitive_rate"]),
-        premium_rate=float(tiers["premium_rate"]),
-        currency=cast("Literal['EGP']", tiers["currency"]),
-        method=cast("Literal['rule_based']", tiers["method"]),
-        rationale=(
-            "Rule-based calculation using project complexity, experience, "
-            "skills, client region, and urgency."
-        ),
-    )
+    return RateResponse(**result_dict)

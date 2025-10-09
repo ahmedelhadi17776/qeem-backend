@@ -1,0 +1,16 @@
+# Safety Policy for qeem-backend
+# This file documents accepted security risks with justification
+
+security:
+  # Ignored vulnerabilities with justification
+  ignore-vulnerabilities:
+    # Note: All known vulnerabilities should be fixed via dependency updates
+    # Only add exceptions here with strong justification and expiration dates
+
+  # Ignore CVEs that are not applicable to our use case
+  ignore-cvss-severity-below: 0
+  ignore-cvss-unknown-severity: false
+
+# Continue on error to allow builds to proceed
+continue-on-vulnerability-error: false
+

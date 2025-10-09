@@ -75,6 +75,10 @@ rate_calculations_total = Counter(
     "rate_calculations_total", "Total rate calculations", ["project_type", "complexity"]
 )
 
+ml_vs_rules_usage_total = Counter(
+    "ml_vs_rules_usage_total", "ML vs rule-based calculation usage", ["method"]
+)
+
 email_sends_total = Counter(
     "email_sends_total", "Total emails sent", ["email_type", "status"]
 )
@@ -214,11 +218,10 @@ def record_user_login(method: str = "email"):
     user_logins_total.labels(method=method).inc()
 
 
-def record_rate_calculation(project_type: str, complexity: str):
-    """Record rate calculation."""
-    rate_calculations_total.labels(
-        project_type=project_type, complexity=complexity
-    ).inc()
+def record_rate_calculation(project_type: str, complexity: str, method: str):
+    """Record metrics for a rate calculation."""
+    rate_calculations_total.labels(project_type, complexity).inc()
+    ml_vs_rules_usage_total.labels(method).inc()
 
 
 def record_email_send(email_type: str, status: str = "success"):

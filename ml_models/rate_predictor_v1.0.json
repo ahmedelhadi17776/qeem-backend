@@ -1,0 +1,7 @@
+{
+  "version": "1.0",
+  "trained_at": "2025-10-09T07:31:18.977129",
+  "training_samples": 800,
+  "xgb_weight": 0.6,
+  "lgbm_weight": 0.4
+}
