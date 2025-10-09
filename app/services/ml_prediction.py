@@ -1,7 +1,7 @@
 """ML prediction service for rate calculations."""
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from pathlib import Path
 import joblib
 import pandas as pd
@@ -21,8 +21,8 @@ class MLPredictionService:
             model_path: Path to trained model file
         """
         self.model_path = Path(model_path)
-        self.model = None
-        self.feature_engineer = None
+        self.model: Optional[Dict[str, Any]] = None
+        self.feature_engineer: Optional[Any] = None
         self.loaded = False
 
         # Try to load model on initialization
@@ -190,6 +190,11 @@ class MLPredictionService:
             # Calculate confidence score
             confidence = self._calculate_confidence(features)
 
+            # Get model version
+            model_version = "1.0"
+            if self.model is not None:
+                model_version = self.model.get("metadata", {}).get("version", "1.0")
+
             return {
                 "minimum_rate": float(minimum_rate),
                 "competitive_rate": float(round(competitive_rate)),
@@ -197,7 +202,7 @@ class MLPredictionService:
                 "currency": "EGP",
                 "method": "ml_prediction",
                 "confidence_score": float(confidence),
-                "model_version": self.model.get("metadata", {}).get("version", "1.0"),
+                "model_version": model_version,
             }
 
         except Exception as e:
@@ -213,6 +218,9 @@ class MLPredictionService:
         Returns:
             Predicted competitive rate
         """
+        if self.model is None:
+            raise RuntimeError("Model is not loaded")
+
         # Extract model components
         xgb_model = self.model["xgb_model"]
         lgbm_model = self.model["lgbm_model"]
@@ -248,6 +256,9 @@ class MLPredictionService:
         Returns:
             Confidence score (0-1)
         """
+        if self.model is None:
+            return 0.75  # Default confidence if model not loaded
+
         try:
             # Get predictions from both models
             xgb_model = self.model["xgb_model"]
@@ -283,7 +294,7 @@ class MLPredictionService:
         Returns:
             Dictionary with model metadata
         """
-        if not self.is_available():
+        if not self.is_available() or self.model is None:
             return {"status": "not_loaded"}
 
         metadata = self.model.get("metadata", {})

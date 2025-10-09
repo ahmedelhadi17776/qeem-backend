@@ -1,6 +1,6 @@
 """Pydantic schemas for rate calculation requests and responses."""
 
-from typing import Literal, Annotated
+from typing import Literal, Annotated, Optional
 
 from pydantic import BaseModel, Field
 from typing import List
@@ -43,6 +43,16 @@ class RateResponse(BaseModel):
             "Rule-based calculation using project complexity, experience, "
             "skills, client region, and urgency."
         )
+    )
+    # Optional ML-specific fields
+    confidence_score: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Model confidence score (0-1), only for ML predictions",
+    )
+    model_version: Optional[str] = Field(
+        default=None, description="ML model version, only for ML predictions"
     )
 
 

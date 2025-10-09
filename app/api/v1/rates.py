@@ -27,16 +27,17 @@ async def calculate_rate_endpoint(
     request: RateRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
-):
+) -> RateResponse:
     """
     Calculate freelance rate tiers based on project details.
     This endpoint uses A/B testing: a percentage of users will receive
     ML-based predictions, while others receive rule-based calculations.
     """
     # A/B test: 10% of users get ML predictions (users with ID ending in 0)
-    use_ml = (current_user.id % 10) == 0
+    user_id = int(current_user.id)
+    use_ml = (user_id % 10) == 0
 
     result_dict = await calculate_compensation_tiers(
-        payload=request, db=db, user_id=current_user.id, use_ml=use_ml
+        payload=request, db=db, user_id=user_id, use_ml=use_ml
     )
     return RateResponse(**result_dict)

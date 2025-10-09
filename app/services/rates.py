@@ -9,7 +9,7 @@ minimum, competitive, and premium hourly rates in EGP based on:
  - Urgency (normal vs rush)
 """
 
-from typing import Dict, Optional, Union, List, cast, Literal
+from typing import Dict, Optional, List, cast, Literal, TypedDict
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..schemas.rates import RateRequest, RateResponse
@@ -21,6 +21,19 @@ from ..core.config import get_settings
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+class RateCalculationResult(TypedDict, total=False):
+    """Type definition for rate calculation result."""
+
+    minimum_rate: float
+    competitive_rate: float
+    premium_rate: float
+    currency: Literal["EGP"]
+    method: Literal["rule_based", "ml_prediction"]
+    confidence_score: float  # Optional, only for ML predictions
+    model_version: str  # Optional, only for ML predictions
+
 
 # Initialize ML service as a singleton
 _ml_service: Optional[MLPredictionService] = None
@@ -119,21 +132,23 @@ async def calculate_compensation_tiers(
     db: Optional[AsyncSession] = None,
     user_id: Optional[int] = None,
     use_ml: bool = True,
-) -> Dict[str, Union[float, str]]:
+) -> RateCalculationResult:
     """Compute hourly rate tiers in EGP.
 
     If use_ml=True and ML model is available, use ML prediction.
     Otherwise, fall back to rule-based calculation.
     """
     settings = get_settings()
-    result: Dict[str, Union[float, str]] = {}
+    result: RateCalculationResult = {}
 
     # Try ML prediction first if enabled
     if use_ml and settings.enable_ml_predictions:
         ml_service = get_ml_service()
         if ml_service and ml_service.is_available():
             try:
-                result = ml_service.predict_rate(payload)
+                ml_result = ml_service.predict_rate(payload)
+                # Cast to RateCalculationResult
+                result = cast(RateCalculationResult, ml_result)
                 logger.info(f"Used ML prediction for user {user_id}")
             except Exception as e:
                 logger.error(
@@ -159,7 +174,7 @@ async def calculate_compensation_tiers(
         competitive_rate = round(value)
         premium_rate = round(value * 1.3)
 
-        result: Dict[str, Union[float, str]] = {
+        result = {
             "minimum_rate": float(minimum_rate),
             "competitive_rate": float(competitive_rate),
             "premium_rate": float(premium_rate),
