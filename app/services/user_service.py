@@ -5,7 +5,6 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db.database import get_transaction_manager
 from ..core.security import (
     hash_password,
     verify_password,
@@ -55,84 +54,45 @@ class UserService:
         # Hash password
         hashed_password = hash_password(user_data.password)
 
-        # Use transaction to ensure atomicity
-        # Check if we're already in a transaction
-        if self.db.in_transaction():
-            # Already in transaction, just create user directly
-            user_create_data = {
-                "email": user_data.email,
-                "password_hash": hashed_password,
-                "is_active": True,
-                "is_verified": False,  # TODO: Add email verification
-            }
+        # Create user
+        user_create_data = {
+            "email": user_data.email,
+            "password_hash": hashed_password,
+            "is_active": True,
+            "is_verified": False,  # TODO: Add email verification
+        }
 
-            user = await self.user_repo.create(user_create_data)
+        user = await self.user_repo.create(user_create_data)
 
-            # Create user profile
-            profile_data = {
-                "user_id": user.id,
-                "first_name": user_data.first_name,
-                "last_name": user_data.last_name,
-            }
+        # Create user profile
+        profile_data = {
+            "user_id": user.id,
+            "first_name": user_data.first_name,
+            "last_name": user_data.last_name,
+            "country": "Egypt",  # Default for Egyptian freelancers
+            "preferred_currency": "EGP",
+        }
 
-            profile = await self.user_repo.create_profile(profile_data)
-            user.profile = profile
+        profile = await self.user_repo.create_profile(profile_data)
+        user.profile = profile
 
-            # Record audit log
-            await self.audit_service.log_action(
-                user_id=int(user.id),
-                action="user_registration",
-                resource_type="user",
-                resource_id=str(user.id),
-                new_values={"email": user_data.email},
-            )
+        # Record audit log
+        await self.audit_service.log_action(
+            user_id=int(user.id),
+            action="user_registration",
+            resource_type="user",
+            resource_id=str(user.id),
+            new_values={"email": user_data.email},
+        )
 
-            # Record metrics
-            record_user_registration()
+        # Record metrics
+        record_user_registration()
 
-            return user
-        else:
-            # Not in transaction, use transaction manager
-            async with get_transaction_manager(self.db):
-                # Create user
-                user_create_data = {
-                    "email": user_data.email,
-                    "password_hash": hashed_password,
-                    "is_active": True,
-                    "is_verified": False,  # TODO: Add email verification
-                }
+        # Send verification email
+        email_service = EmailService(self.db)
+        await email_service.send_verification_email(user)
 
-                user = await self.user_repo.create(user_create_data)
-
-                # Create user profile
-                profile_data = {
-                    "user_id": user.id,
-                    "first_name": user_data.first_name,
-                    "last_name": user_data.last_name,
-                    "country": "Egypt",  # Default for Egyptian freelancers
-                    "preferred_currency": "EGP",
-                }
-
-                profile = await self.user_repo.create_profile(profile_data)
-                user.profile = profile
-
-                # Record audit log
-                await self.audit_service.log_action(
-                    user_id=int(user.id),
-                    action="user_registration",
-                    resource_type="user",
-                    resource_id=str(user.id),
-                    new_values={"email": user_data.email},
-                )
-
-                # Record metrics
-                record_user_registration()
-
-                # Send verification email
-                email_service = EmailService(self.db)
-                await email_service.send_verification_email(user)
-
-            return user
+        return user
 
     async def authenticate_user(self, email: str, password: str) -> Optional[User]:
         """Authenticate user with email and password.
@@ -226,43 +186,21 @@ class UserService:
         if not user:
             return None
 
-        # Use transaction to ensure atomicity
-        # Check if we're already in a transaction
-        if self.db.in_transaction():
-            # Already in transaction, just update profile directly
-            # Get existing profile or create new one
-            profile = await self.user_repo.get_profile(user_id)
+        # Get existing profile or create new one
+        profile = await self.user_repo.get_profile(user_id)
 
-            # Convert Pydantic model to dict, excluding None values
-            update_data = {
-                k: v for k, v in profile_data.model_dump().items() if v is not None
-            }
+        # Convert Pydantic model to dict, excluding None values
+        update_data = {
+            k: v for k, v in profile_data.model_dump().items() if v is not None
+        }
 
-            if profile:
-                # Update existing profile
-                return await self.user_repo.update_profile(profile, update_data)
-            else:
-                # Create new profile
-                update_data["user_id"] = user_id
-                return await self.user_repo.create_profile(update_data)
+        if profile:
+            # Update existing profile
+            return await self.user_repo.update_profile(profile, update_data)
         else:
-            # Not in transaction, use transaction manager
-            async with get_transaction_manager(self.db):
-                # Get existing profile or create new one
-                profile = await self.user_repo.get_profile(user_id)
-
-                # Convert Pydantic model to dict, excluding None values
-                update_data = {
-                    k: v for k, v in profile_data.model_dump().items() if v is not None
-                }
-
-                if profile:
-                    # Update existing profile
-                    return await self.user_repo.update_profile(profile, update_data)
-                else:
-                    # Create new profile
-                    update_data["user_id"] = user_id
-                    return await self.user_repo.create_profile(update_data)
+            # Create new profile
+            update_data["user_id"] = user_id
+            return await self.user_repo.create_profile(update_data)
 
     def create_access_token_for_user(self, user: User) -> str:
         """Create JWT access token for user.

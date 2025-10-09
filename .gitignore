@@ -181,3 +181,38 @@ Thumbs.db
 test_*.db
 test_*.sqlite
 test_*.sqlite3
+test.db
+test_ci.db
+
+# ML Models (generated artifacts - should be versioned separately)
+ml_models/*.pkl
+ml_models/*.joblib
+ml_models/*.h5
+ml_models/*.pt
+ml_models/*.pth
+ml_models/*.onnx
+# Keep model metadata for documentation
+!ml_models/*.json
+!ml_models/README.md
+
+# Coverage reports
+coverage.xml
+htmlcov/
+.coverage
+.coverage.*
+
+# Security scan reports
+*-report.json
+*.sarif
+bandit-report.json
+safety-report.json
+semgrep-report.json
+backend-trivy-results.sarif
+
+# Helper/utility scripts (temporary)
+update_tests.py
+verify_db.py
+test_ml_service.py
+
+# GitHub artifacts
+.github/workflows/*.lock

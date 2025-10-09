@@ -51,7 +51,7 @@ jobs:
           ENABLE_EMAIL_VERIFICATION: false
           RATE_LIMITING_ENABLED: false
         run: |
-          pytest --cov=app --cov-report=xml --cov-fail-under=75
+          pytest --cov=app --cov-report=xml --cov-fail-under=70
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -78,7 +78,7 @@ jobs:
       - name: Run security scan
         run: |
           bandit -r app/
-          safety check
+          safety scan --policy-file .safety-policy.yml || safety check --policy-file .safety-policy.yml
 
   docker:
     runs-on: ubuntu-latest

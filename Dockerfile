@@ -14,7 +14,10 @@ RUN apk add --no-cache \
     openssl-dev \
     musl-dev \
     linux-headers \
-    postgresql-dev
+    postgresql-dev \
+    cmake \
+    g++ \
+    gcc
 
 COPY requirements.txt ./
 
