@@ -134,8 +134,7 @@ We will respond within 48 hours and provide a timeline for fix.
 
 ## Security Contacts
 
-- Security Team: [Your security email]
-- Maintainer: [Your email]
+- Maintainer: [ahmedelhadi1777@gmail.com]
 
 ---
 
