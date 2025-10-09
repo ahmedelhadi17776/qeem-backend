@@ -12,11 +12,37 @@ minimum, competitive, and premium hourly rates in EGP based on:
 from typing import Dict, Optional, Union, List, cast, Literal
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db.database import get_transaction_manager
 from ..schemas.rates import RateRequest, RateResponse
 from ..repositories.rate_repository import RateRepository
 from ..infra.metrics import record_rate_calculation
 from ..services.audit_service import AuditService
+from ..services.ml_prediction import MLPredictionService
+from ..core.config import get_settings
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Initialize ML service as a singleton
+_ml_service: Optional[MLPredictionService] = None
+
+
+def get_ml_service() -> Optional[MLPredictionService]:
+    """Get a singleton instance of the MLPredictionService."""
+    global _ml_service
+    settings = get_settings()
+    if settings.enable_ml_predictions and _ml_service is None:
+        try:
+            _ml_service = MLPredictionService(model_path=settings.ml_model_path)
+            if not _ml_service.is_available():
+                _ml_service = None
+                raise FileNotFoundError("ML model loaded but is not available.")
+        except FileNotFoundError:
+            logger.warning(
+                f"ML model file not found at {settings.ml_model_path}. "
+                "Falling back to rule-based calculations."
+            )
+            _ml_service = None
+    return _ml_service
 
 
 def _base_rate_for_project_type(project_type: str) -> float:
@@ -92,121 +118,100 @@ async def calculate_compensation_tiers(
     payload: RateRequest,
     db: Optional[AsyncSession] = None,
     user_id: Optional[int] = None,
+    use_ml: bool = True,
 ) -> Dict[str, Union[float, str]]:
     """Compute hourly rate tiers in EGP.
 
-    Strategy:
-      base = project_type baseline
-      x complexity x experience x skills x client_region x urgency
-      tiers: min=0.8x, competitive=1.0x, premium=1.3x (rounded to whole EGP)
+    If use_ml=True and ML model is available, use ML prediction.
+    Otherwise, fall back to rule-based calculation.
     """
-    base = _base_rate_for_project_type(payload.project_type)
-    value = (
-        base
-        * _complexity_multiplier(payload.project_complexity)
-        * _experience_multiplier(int(payload.experience_years))
-        * _skills_multiplier(int(payload.skills_count))
-        * _client_region_multiplier(payload.client_region)
-        * _urgency_multiplier(payload.urgency)
-    )
+    settings = get_settings()
+    result: Dict[str, Union[float, str]] = {}
 
-    # ensure a sensible lower bound
-    minimum_rate = round(max(80.0, value * 0.8))
-    competitive_rate = round(value)
-    premium_rate = round(value * 1.3)
+    # Try ML prediction first if enabled
+    if use_ml and settings.enable_ml_predictions:
+        ml_service = get_ml_service()
+        if ml_service and ml_service.is_available():
+            try:
+                result = ml_service.predict_rate(payload)
+                logger.info(f"Used ML prediction for user {user_id}")
+            except Exception as e:
+                logger.error(
+                    f"ML prediction failed for user {user_id}: {e}. "
+                    "Falling back to rules."
+                )
+                result = {}  # Clear result to ensure fallback
 
-    result: Dict[str, Union[float, str]] = {
-        "minimum_rate": float(minimum_rate),
-        "competitive_rate": float(competitive_rate),
-        "premium_rate": float(premium_rate),
-        "currency": "EGP",
-        "method": "rule_based",
-    }
+    # Fall back to rule-based calculation if ML is disabled, fails, or is not used
+    if not result:
+        base = _base_rate_for_project_type(payload.project_type)
+        value = (
+            base
+            * _complexity_multiplier(payload.project_complexity)
+            * _experience_multiplier(int(payload.experience_years))
+            * _skills_multiplier(int(payload.skills_count))
+            * _client_region_multiplier(payload.client_region)
+            * _urgency_multiplier(payload.urgency)
+        )
+
+        # ensure a sensible lower bound
+        minimum_rate = round(max(80.0, value * 0.8))
+        competitive_rate = round(value)
+        premium_rate = round(value * 1.3)
+
+        result: Dict[str, Union[float, str]] = {
+            "minimum_rate": float(minimum_rate),
+            "competitive_rate": float(competitive_rate),
+            "premium_rate": float(premium_rate),
+            "currency": "EGP",
+            "method": "rule_based",
+        }
+        logger.info(f"Used rule-based calculation for user {user_id}")
 
     # Save calculation to database if session and user_id are provided
     if db and user_id:
-        # Check if we're already in a transaction
-        if db.in_transaction():
-            # Already in transaction, just create rate calculation directly
-            rate_repo = RateRepository(db)
-            calculation_data = {
-                "user_id": user_id,
+        rate_repo = RateRepository(db)
+        calculation_data = {
+            "user_id": user_id,
+            "project_type": payload.project_type,
+            "project_complexity": payload.project_complexity,
+            "estimated_hours": payload.estimated_hours,
+            "experience_years": payload.experience_years,
+            "skills_count": payload.skills_count,
+            "location": payload.location,
+            "minimum_rate": result.get("minimum_rate"),
+            "competitive_rate": result.get("competitive_rate"),
+            "premium_rate": result.get("premium_rate"),
+            "calculation_method": result.get("method", "rule_based"),
+            "confidence_score": result.get("confidence_score"),
+        }
+        await rate_repo.create(calculation_data)
+
+        # Record metrics
+        record_rate_calculation(
+            payload.project_type,
+            payload.project_complexity,
+            method=str(result.get("method", "rule_based")),
+        )
+
+        # Log audit trail
+        audit_service = AuditService(db)
+        audit_service.log_action_async(
+            user_id=user_id,
+            action="rate_calculation",
+            resource_type="rate_calculation",
+            resource_id=str(calculation_data.get("id", "pending")),
+            new_values={
                 "project_type": payload.project_type,
                 "project_complexity": payload.project_complexity,
                 "estimated_hours": payload.estimated_hours,
                 "experience_years": payload.experience_years,
-                "skills_count": payload.skills_count,
-                "location": payload.location,
-                "minimum_rate": result["minimum_rate"],
-                "competitive_rate": result["competitive_rate"],
-                "premium_rate": result["premium_rate"],
-                "calculation_method": "rule_based",
-            }
-            await rate_repo.create(calculation_data)
-
-            # Record metrics
-            record_rate_calculation(payload.project_type, payload.project_complexity)
-
-            # Log audit trail
-            audit_service = AuditService(db)
-            audit_service.log_action_async(
-                user_id=user_id,
-                action="rate_calculation",
-                resource_type="rate_calculation",
-                resource_id=str(calculation_data.get("id", "pending")),
-                new_values={
-                    "project_type": payload.project_type,
-                    "project_complexity": payload.project_complexity,
-                    "estimated_hours": payload.estimated_hours,
-                    "experience_years": payload.experience_years,
-                    "minimum_rate": result["minimum_rate"],
-                    "competitive_rate": result["competitive_rate"],
-                    "premium_rate": result["premium_rate"],
-                },
-                success=True,
-            )
-        else:
-            # Not in transaction, use transaction manager
-            async with get_transaction_manager(db):
-                rate_repo = RateRepository(db)
-                calculation_data = {
-                    "user_id": user_id,
-                    "project_type": payload.project_type,
-                    "project_complexity": payload.project_complexity,
-                    "estimated_hours": payload.estimated_hours,
-                    "experience_years": payload.experience_years,
-                    "skills_count": payload.skills_count,
-                    "location": payload.location,
-                    "minimum_rate": result["minimum_rate"],
-                    "competitive_rate": result["competitive_rate"],
-                    "premium_rate": result["premium_rate"],
-                    "calculation_method": "rule_based",
-                }
-                await rate_repo.create(calculation_data)
-
-                # Record metrics
-                record_rate_calculation(
-                    payload.project_type, payload.project_complexity
-                )
-
-                # Log audit trail
-                audit_service = AuditService(db)
-                audit_service.log_action_async(
-                    user_id=user_id,
-                    action="rate_calculation",
-                    resource_type="rate_calculation",
-                    resource_id=str(calculation_data.get("id", "pending")),
-                    new_values={
-                        "project_type": payload.project_type,
-                        "project_complexity": payload.project_complexity,
-                        "estimated_hours": payload.estimated_hours,
-                        "experience_years": payload.experience_years,
-                        "minimum_rate": result["minimum_rate"],
-                        "competitive_rate": result["competitive_rate"],
-                        "premium_rate": result["premium_rate"],
-                    },
-                    success=True,
-                )
+                "minimum_rate": result.get("minimum_rate"),
+                "competitive_rate": result.get("competitive_rate"),
+                "premium_rate": result.get("premium_rate"),
+            },
+            success=True,
+        )
 
     return result
 

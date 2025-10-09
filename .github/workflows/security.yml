@@ -31,11 +31,9 @@ jobs:
 
             - name: Run Safety dependency scan
               run: |
-                  safety check --json --output safety-report.json
-                  safety check
-                  echo "Checking security of new production dependencies..."
-                  safety check --short-report prometheus-client prometheus-fastapi-instrumentator
-                  echo "Dependencies check completed"
+                  safety scan --policy-file .safety-policy.yml --output json --save-as safety-report.json || safety check --policy-file .safety-policy.yml --json --output safety-report.json
+                  safety scan --policy-file .safety-policy.yml || safety check --policy-file .safety-policy.yml
+                  echo "Dependencies scan completed"
               continue-on-error: true
 
             - name: Run Semgrep security scan

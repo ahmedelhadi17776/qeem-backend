@@ -90,14 +90,23 @@ class AppSettings(BaseSettings):
     cors_origins: List[str] = Field(default_factory=list)
 
     # Feature flags
-    enable_ml_predictions: bool = Field(default=False, alias="ENABLE_ML_PREDICTIONS")
+    enable_ml_predictions: bool = Field(
+        default=False, description="Enable ML-based rate predictions"
+    )
+    ml_model_path: str = Field(
+        default="./ml_models/rate_predictor_v1.0.pkl",
+        description="Path to the trained ML model",
+    )
+    ml_fallback_to_rules: bool = Field(
+        default=True, description="Fallback to rule-based calculation if ML fails"
+    )
     enable_ai_negotiation: bool = Field(default=False, alias="ENABLE_AI_NEGOTIATION")
     enable_rate_limiting: bool = Field(default=False, alias="RATE_LIMITING_ENABLED")
     market_cache_ttl: int = Field(default=3600, alias="MARKET_CACHE_TTL")
 
     # Nested
     security: SecuritySettings = SecuritySettings()
-    sentry: SentrySettings = SentrySettings()
+    sentry: SentrySettings = Field(default_factory=SentrySettings)
     database: DatabaseSettings = DatabaseSettings()
     email: EmailSettings = EmailSettings()
     rate_limit: RateLimitSettings = RateLimitSettings()
